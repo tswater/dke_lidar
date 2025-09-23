@@ -352,7 +352,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pywt
 
-# 2017-2024 (1181 days, allegedly)
+# 2017-2024 (1181 days, allegedly)y
 tp = nc.Dataset('lst_dat.nc', 'r')
 lst_std_ts = tp['std'][:]
 lst_mean_ts = tp['mean'][:]
@@ -673,94 +673,45 @@ while date <= fdate:
         for file in files:
             doy = '%04d%02d%02d' % (date.year,date.month,date.day)
             if doy not in file:continue
-        #print(file)
             fp = nc.Dataset(file)
-            #file2 = '/stor/tyche/hydro/shared/HRRR/hrrr2.{}.t{}z.grib2'.format(doy, 14)
-            #hfp_a = xr.open_dataset(file2, engine='cfgrib', filter_by_keys={'stepType':'accum','typeOfLevel':'surface'}, backend_kwargs={'indexpath':''})
-            #hfp_s = xr.open_dataset(file2, engine='cfgrib', filter_by_keys={'stepType':'instant','typeOfLevel':'surface'}, backend_kwargs={'indexpath':''})
-            #hfp_iso = xr.open_dataset(file2, engine='cfgrib', filter_by_keys={'typeOfLevel':'isobaricInhPa'}, backend_kwargs={'indexpath':''})
-        #print(fp)
             dates = nc.num2date(fp['time'][:],units=fp['time'].units)
+            
+            ## THIS IS THE TIME FILTERING 
+            
             #m = (dates >= datetime.datetime(date.year,date.month,date.day,15,0)) & (dates <= datetime.datetime(date.year,date.month,date.day,21,0)) # time of day
             m = (dates >= datetime.datetime(date.year,date.month,date.day,15,0)) & (dates <= datetime.datetime(date.year,date.month,date.day,17,0)) # time of day
-        ################################################################################# 
-        # Accounting for different sizes in time --> scaling together
+            ################################################################################# 
+            # Accounting for different sizes in time --> scaling together
             if fp['u'].shape[1] != 164:continue
             if dates.size == 144:
-         # U Profile
-         #u_error = fp['u_error'][m,:]
                 tmp = fp['u'][m,:].data
-         #tmp[u_error > error_tsh] = -9999
                 tmpu = upscale(tmp,6)
-
-         # V Profile
-         #v_error = fp['v_error'][m,:]
                 tmp = fp['v'][m,:].data
-         #tmp[v_error > error_tsh] = -9999
                 tmpv = upscale(tmp,6)
-
-         # W Profile
-         #w_error = fp['w_error'][m,:]
                 tmp = fp['w'][m,:].data
-         #tmp[w_error > error_tsh] = -9999
                 tmpw = upscale(tmp,6)
             if dates.size == 96:
-         # U Profile
-         #u_error = fp['u_error'][m,:]
                 tmp = fp['u'][m,:].data
-         #tmp[u_error > error_tsh] = -9999
                 tmpu = upscale(tmp,4)
-
-         # V Profile
-         #v_error = fp['v_error'][m,:]
                 tmp = fp['v'][m,:].data
-         #tmp[v_error > error_tsh] = -9999
                 tmpv = upscale(tmp,4)
-
-         # W Profile
-         #w_error = fp['w_error'][m,:]
                 tmp = fp['w'][m,:].data
-         #tmp[w_error > error_tsh] = -9999
                 tmpw = upscale(tmp,4)
-        #print(tmpu.shape,tmpv.shape,tmpw.shape)
-         
-        # Height and Density
             z = fp['height'][:]
-        #print(z.shape)
             fp.close()
             rho = calculate_air_density(z,0,1000) #######################################################################
-            #rho = calculate_air_density(z,0,500)
             ug.append((tmpu**2+tmpv**2)**0.5) # horizontal wind speed
-        #print(tmpu.shape,tmp.shape)
             u.append(tmpu)
             v.append(tmpv)
             w.append(tmpw)
-        #ug.append((fp['u'][m,:]**2+fp['v'][m,:]**2)**0.5)
-        #if (np.sum(m) < 48):continue
-        #ug.append((fp['u'][m,:]**2+fp['v'][m,:]**2)**0.5)
-        #u.append(fp['u'][m,:])
-        #v.append(fp['v'][m,:])
-        #print('here')
-
-     # Collected Data
-        #u = np.asarray(u, dtype='object')
-        #v = np.asarray(v, dtype='object')
-        #w = np.asarray(w, dtype='object')
-        #ug = np.asarray(ug, dtype='object')
-        #try:
         u = np.array(u) # failing on July 30 2021
         v = np.array(v)
         w = np.array(w)
         ug = np.array(ug)
-        #except:
-        #    DKE = -9999
-        #    MKE = -9999
-        #    ug = -9999
-        #    continue
         
-     # Screen, make sure the LiDARs are reporting at the same time (5 for 2017-22, 3 for 23-24)
-     # Relax this next: only 3 instead of 5 (for all years)
-     # relaxed again?
+        # Screen, make sure the LiDARs are reporting at the same time (5 for 2017-22, 3 for 23-24)
+        # Relax this next: only 3 instead of 5 (for all years)
+        # relaxed again?
         nsamples = u != -9999
         if date.year > 2022:
             m = np.sum(nsamples,axis=0) < 3 ########################################################################################################
@@ -786,32 +737,17 @@ while date <= fdate:
         u[m] = -9999
         v[m] = -9999
         w[m] = -9999
-     #
 
-     # Masking
+         # Masking
         u = np.ma.masked_array(u,u==-9999)
         v = np.ma.masked_array(v,v==-9999)
         w = np.ma.masked_array(w,w==-9999)
         ug = np.ma.masked_array(ug,ug==-9999)
-        #print(np.shape(ug))
-     #break
-        
-     # WSF (10 AM - 4 PM)
-     # fronts/synoptic stuff (entire day) , winds, dew point
-     # up to present (May-Sep), present LST and LiDAR data
-     # heavier rains/large storms (mm of rain as a mean, daytime)
-     # Check anomalous day(s) --> 9 August 2018 [from wunderground: fog and clouds in the morning before 10 AM]
-     # See all anaylsis fields, play around
-     # Bounding box = [-97.9882090,37.1077130] to [-96.9882090,36.1077130]
-     # Central index = [610, 899] --> previous days
-        # Wind Speed 
-        # Start relaxing this now
         
         c5 = np.sum(ug[:,:,0] > 10) # wind screening, edit
         c10 = np.sum(ug[:,:,-1] > 20) ###########################################################################################################
         
         screened = 0
-     #print(c5,c10)
         '''
         if ((c5 > 0) | (c10 > 0)):
             u[:] = -9999
@@ -829,8 +765,7 @@ while date <= fdate:
             product='sfc', # produce name?
             fxx=0, # lead time, want 0
             #save_dir='/home/pjg25/tyche/data'
-            save_dir = '/home/pjg25/soteria/herbie'
-        )
+            save_dir = '/home/pjg25/soteria/herbie')
         
         try:
             ds = H.xarray(':[UV]GRD:', remove_grib=False)
@@ -863,22 +798,20 @@ while date <= fdate:
                 v[:] = -9999
                 w[:] = -9999
                 wsf += 1
-        
-        
-     # Spatial Variance (DKE)
+        # Spatial Variance (DKE)
         up2 = np.var(u,axis=0,ddof=1)[:,:]
         vp2 = np.var(v,axis=0,ddof=1)[:,:]
         wp2 = np.var(w,axis=0,ddof=1)[:,:]
-     # Spatial Mean and Squaring (MKE)
+        # Spatial Mean and Squaring (MKE)
         u2 = np.mean(u,axis=0)[:,:]**2
         v2 = np.mean(v,axis=0)[:,:]**2
         w2 = np.mean(w,axis=0)[:,:]**2
         ug = np.mean(ug[:,:])
-     # Adding
+        # Adding
         DKE = up2 + vp2 + wp2
         DKEmorn = up2[:,0] + vp2[:,0] + wp2[:,0]
         MKE = u2 + v2 + w2
-    #except: # Fills
+        #except: # Fills
     else:
         DKE = -9999
         MKE = -9999

@@ -88,7 +88,7 @@ print(len(f))
 # May 1 (non-leap)
 sdate = datetime.datetime(2017,5,1)  # find earliest
 edate = datetime.datetime(2023,9,30) # 273
-s = sdate.timetuple().tm_yday 
+s = sdate.timetuple().tm_yday
 e = edate.timetuple().tm_yday
 print((s,e))
 
@@ -96,7 +96,7 @@ test = '/stor/soteria/hydro/shared/data/GOES/GOES-16-EPSG4326/%04d/%s%s%02d*' % 
 yes = glob.glob(test)[0] # exists?
 
 # %%
-# Length Scales for GOES LST data 
+# Length Scales for GOES LST data
 import gstools as gs
 from scipy.optimize import curve_fit
 
@@ -146,7 +146,7 @@ lst_std_ts,lst_mean_ts,lst_lscale_ts = [],[],[] # Length Scales and Statistics
 #fdate = datetime.datetime(2024,5,10) # end date
 #date = datetime.datetime(2023,9,29) # start date
 fdate = datetime.datetime(2024,10,1) # target
-date = datetime.datetime(2017,6,12) # data starts at June 11, 2017? 
+date = datetime.datetime(2017,6,12) # data starts at June 11, 2017?
 
 count = 0
 while date <= fdate:
@@ -154,11 +154,11 @@ while date <= fdate:
     if date.month < 5:continue
     if date.month > 9:continue
     # May - Sep
-    
+
     #if date.year == 2020:continue
-    #if '%04d%02d%02d' % (date.year,date.month,date.day) not in dates_lasso:continue  
+    #if '%04d%02d%02d' % (date.year,date.month,date.day) not in dates_lasso:continue
     if (date.year >= 2018) & (date.year <= 2022):
-        date_lasso = '%04d%02d%02d' % (date.year,date.month,date.day) # 
+        date_lasso = '%04d%02d%02d' % (date.year,date.month,date.day) #
     else:
         daynum = date.timetuple().tm_yday
         date_lasso = '%04d%03d' % (date.year, daynum)
@@ -166,7 +166,7 @@ while date <= fdate:
     # Formatting
     #print(date_lasso)
     #for hour in range(18,24):
-    
+
     lst_std,lst_mean,lst_lscale = [],[],[]
     for hour in range(15,16): #morning/near clear sky
         if (date.year >= 2018) & (date.year <= 2022):
@@ -191,13 +191,13 @@ while date <= fdate:
                 lst_lscale.append(-9999)
                 continue
             file = file[0]
-                
+
         if os.path.exists(file):
             #print(file)
             data = rasterio.open(file).read(1)
             # data2 --> split surface and 500 hPa winds
             #print(np.sum(data==0),0.5*data.size)
-            
+
             # Screening for undefined values (implicitly checking for clouds)
             # in the holes data --> nans
             if np.sum((data==0) | (data!=data)) > 0.1*data.size: ############################################################################################
@@ -206,7 +206,7 @@ while date <= fdate:
                 lst_lscale.append(-9999)
                 continue
 
-           
+
             else: # Morning Sky Check Passed
              tmp = np.copy(data)
              tmp[tmp != tmp] = np.mean(tmp[tmp == tmp])
@@ -232,12 +232,12 @@ while date <= fdate:
              lst_lscale.append(meso_lh)
              lst_std.append(np.std(lst_mesoscale))
              lst_mean.append(np.mean(lst_mesoscale))
-                
+
         else: # Fill if no file found
             lst_std.append(-9999)
             lst_mean.append(-9999)
             lst_lscale.append(-9999)
-            
+
     lst_std = np.array(lst_std)
     lst_mean = np.array(lst_mean)
     lst_lscale = np.array(lst_lscale)
@@ -253,7 +253,7 @@ while date <= fdate:
     #print(date_lasso,(lst_lscale*lst_std)/lst_mean,count,len(lst_std_ts))
     lst_lscale_ts.append(lst_lscale)
     count += 1
-    
+
 lst_std_ts = np.array(lst_std_ts)
 lst_mean_ts = np.array(lst_mean_ts)
 lst_lscale_ts = np.array(lst_lscale_ts)
@@ -269,7 +269,7 @@ fp = nc.Dataset(f, 'w')
 fp.createDimension('date')
 
 # Vars
-fp.createVariable('date', 'i8', dimensions=('date')) 
+fp.createVariable('date', 'i8', dimensions=('date'))
 fp['date'].units = 'calendar date'
 fp.createVariable('std', 'f', dimensions=('date'))
 fp['std'].units = 'Kelvin'
@@ -389,7 +389,7 @@ date = datetime.datetime(2017,6,12)
 sd = '%04d%02d%02d' % (date.year,date.month,date.day)
 
 # Pre-Screen where the count starts
-d = datetime.datetime(2017,6,12) 
+d = datetime.datetime(2017,6,12)
 all_dates = [d]
 while d <= fdate:
     d = d + datetime.timedelta(days=1)
@@ -434,7 +434,7 @@ while date <= fdate:
     if True == True:
         if (date.year < 2018) | (date.year > 2022):
             files = holes
-        else: 
+        else:
             files = arm1
         for file in files:
             doy = '%04d%02d%02d' % (date.year,date.month,date.day)
@@ -513,7 +513,7 @@ z1 = np.ma.getdata(z)
 
 # Boundary Layer (consecutive exceedance)
 def consec_exceed(array, val, cons): # 5-15 consecutive layers (~500 m)
-    i = 0 
+    i = 0
     for a in array:
         if a > val:
             i += 1
@@ -530,7 +530,7 @@ def check_br(br_array, threshold, intervals):
     for j in range(len(br_array)):
         check += [consec_exceed(br_array[0:10+j], threshold, intervals)]
     bi = np.min(np.where(np.array(check) == True))
-    
+
     return bi # index of altitude array
 
 
@@ -578,23 +578,23 @@ def upscale(yin,window): # Upscaling Data?
                 yout[count,j] = np.mean(yin[i:i+window,j][m1])
         i = i + window
         count += 1
-    return yout 
+    return yout
 
 # Density Function (not important)
 def calculate_air_density(z,minz,maxz): #hack
-        T = 20 - 0.00649 * z;                        
+        T = 20 - 0.00649 * z;
         P = (101.29) * ((T + 273.15)/288.08)**(5.256);
         rho =  P/(0.2869*(T + 273.15));
         rho[z < minz] = 0.0
         rho[z > maxz] = 0.0
         return rho
-                                
+
 #files = glob.glob('/home/nc153/soteria/data/SGP/DL/*.nc')
 # ARM Data, substitute my own files here as needed
 arm1 = glob.glob('/home/nc153/soteria/ftp2.archive.arm.gov/chaneyn1/245518/*.nc') # ARM
 holes = glob.glob('/stor/soteria/hydro/private/pjg25/ARM/*') # 2016-17, 23 (none for May 24)
 sonde = glob.glob('/stor/soteria/hydro/private/pjg25/sgpsondewn/*') # radiosonde (available for all days 2017-22
-# combine these, screen duplicates? 
+# combine these, screen duplicates?
 
 # add data from 2024 if its available
 u = []
@@ -614,7 +614,7 @@ sd = '%04d%02d%02d' % (date.year,date.month,date.day)
 error_tsh = 10.0 # error threshold
 
 # Pre-Screen where the count starts
-d = datetime.datetime(2017,6,12) 
+d = datetime.datetime(2017,6,12)
 all_dates = [d]
 while d <= fdate:
     d = d + datetime.timedelta(days=1)
@@ -628,7 +628,7 @@ all_dates = np.array(all_dates)
 #count = count_start # start slice
 count = 0
 
-# Attribution Structure 
+# Attribution Structure
 total = 0 # total day counter (after clear sky)
 wind = 0 # days removed in the wind check
 report = 0 # days removed in the reporting check
@@ -668,19 +668,19 @@ while date <= fdate:
     if True == True:
         if (date.year < 2018) | (date.year > 2022):
             files = holes
-        else: 
+        else:
             files = arm1
         for file in files:
             doy = '%04d%02d%02d' % (date.year,date.month,date.day)
             if doy not in file:continue
             fp = nc.Dataset(file)
             dates = nc.num2date(fp['time'][:],units=fp['time'].units)
-            
-            ## THIS IS THE TIME FILTERING 
-            
+
+            ## THIS IS THE TIME FILTERING
+
             #m = (dates >= datetime.datetime(date.year,date.month,date.day,15,0)) & (dates <= datetime.datetime(date.year,date.month,date.day,21,0)) # time of day
             m = (dates >= datetime.datetime(date.year,date.month,date.day,15,0)) & (dates <= datetime.datetime(date.year,date.month,date.day,17,0)) # time of day
-            ################################################################################# 
+            #################################################################################
             # Accounting for different sizes in time --> scaling together
             if fp['u'].shape[1] != 164:continue
             if dates.size == 144:
@@ -708,7 +708,7 @@ while date <= fdate:
         v = np.array(v)
         w = np.array(w)
         ug = np.array(ug)
-        
+
         # Screen, make sure the LiDARs are reporting at the same time (5 for 2017-22, 3 for 23-24)
         # Relax this next: only 3 instead of 5 (for all years)
         # relaxed again?
@@ -743,10 +743,10 @@ while date <= fdate:
         v = np.ma.masked_array(v,v==-9999)
         w = np.ma.masked_array(w,w==-9999)
         ug = np.ma.masked_array(ug,ug==-9999)
-        
+
         c5 = np.sum(ug[:,:,0] > 10) # wind screening, edit
         c10 = np.sum(ug[:,:,-1] > 20) ###########################################################################################################
-        
+
         screened = 0
         '''
         if ((c5 > 0) | (c10 > 0)):
@@ -756,7 +756,7 @@ while date <= fdate:
             wind += 1
             screened = 1
         '''
-        
+
         # Herbie + Metpy Vort
         forecast = '%04d-%02d-%02d 15:00' % (date.year,date.month,date.day) # string to herbie
         H = Herbie(
@@ -766,14 +766,14 @@ while date <= fdate:
             fxx=0, # lead time, want 0
             #save_dir='/home/pjg25/tyche/data'
             save_dir = '/home/pjg25/soteria/herbie')
-        
+
         try:
             ds = H.xarray(':[UV]GRD:', remove_grib=False)
             winds = ds[2]
             uvort = winds['u'].values[2,591:630,887:916] * (units.meter / units.second)
             vvort = winds['v'].values[2,591:630,887:916] * (units.meter / units.second)
-            lat = winds['latitude'].values[591:630,0] 
-            lon = winds['longitude'].values[0,887:916] 
+            lat = winds['latitude'].values[591:630,0]
+            lon = winds['longitude'].values[0,887:916]
             dx, dy = mpcalc.lat_lon_grid_deltas(lon, lat)
             vort = mpcalc.vorticity(uvort, vvort, dx=dx, dy=dy)
             for pointer in ds:
@@ -782,7 +782,7 @@ while date <= fdate:
             vort = 0
         except ValueError:
             vort = 0
-        
+
         if screened == 1:
             pass
         elif type(vort) == int:
@@ -849,12 +849,12 @@ ug_ts = np.array(ug_ts)
      if True == True:
       for file2 in files2:
         doy = '%04d%02d%02d' % (date.year,date.month,date.day)
-        if doy not in file:continue 
+        if doy not in file:continue
         hfp = xr.open_dataset(file2, engine='cfgrib', filter_by_keys={'typeOfLevel':'isobaricInhPa'}, backend_kwargs={'indexpath':''}) # vertical
         hfp_s = xr.open_dataset(file2, engine='cfgrib', filter_by_keys={'stepType':'instant','typeOfLevel':'surface'}, backend_kwargs={'indexpath':''}) # at the surface
         hfp_a = xr.open_dataset(file2, engine='cfgrib', filter_by_keys={'stepType':'accum','typeOfLevel':'surface'}, backend_kwargs={'indexpath':''}) # accumulated
     """
-    """ 
+    """
      # press = hfp.coords['isobaricInhPa'].values
      # p500 = np.where(press == 500)[0] # 500 mbar isobar
      # sp = hfp_s.variables['sp'].values[bl[0]:tr[0], bl[1]:tr[1]] / 100 # substitute values for the box (get elsewhere)
@@ -869,7 +869,7 @@ ug_ts = np.array(ug_ts)
      # need to call HRRR file
      # vort = hfp['absv'][surface index,bl[0]:tr[0],bl[1]:tr[1]].values # s^-1 --> fill in box indices
      # check and fill
- 
+
      # Precipitation / ShCu
      # precip = hfp_a['tp'][bl[0]:tr[0],bl[1]:tr[1]].values # mm, box values
      # check and fill
@@ -890,7 +890,7 @@ set_morning = morning
 # fixed window sizes (move from 0 to 150 or 200): 10, 25, 50?
 # other ranges as needed
 
-# Goal: 
+# Goal:
 # -iterate through and find the correlation at each window (with and without the WSF check active)
 # -find the best performing criteria --> combine with literature to explain findings
 # -use boundary layer stuff here as well
@@ -919,7 +919,7 @@ def DKE_screen(dke,mke,morn,l,h):
 
     # pct change
     pct_change = ((DKE_ts_masked - morning_masked) / morning_masked) * 100
-    
+
     DKE_ts_masked[(pct_change < l) | (pct_change > h)] = -9999
     MKE_ts_masked[(pct_change < l) | (pct_change > h)] = -9999
     morning_masked[(pct_change < l) | (pct_change > h)] = -9999
@@ -967,7 +967,7 @@ b = np.arange(0, 210, 10)
 b[1:]
 
 # %%
-# enumerate all combinations and check 
+# enumerate all combinations and check
 alltens = np.arange(0, 210, 10)
 
 full_array = []
@@ -994,10 +994,10 @@ def find_bw(full, minpts, minwind=None):
             continue
 
         if full[j][4] - full[j][3] < minwind:
-            continue            
-        
+            continue
+
         enough += [full[j]]
-            
+
 
     # find best and worst
     full_list = []
@@ -1010,7 +1010,7 @@ def find_bw(full, minpts, minwind=None):
     min_condition = np.where(full_list == min(full_list))[0][0]
     best = enough[max_condition]
     worst = enough[min_condition]
-    
+
     return best, worst
 
 
@@ -1043,7 +1043,7 @@ ax.text(0.78, 0.85, r'$\rho_{S} = %.2f$' % rho_sr , transform=ax.transAxes, font
 plt.show()# 4 panel subplot as a placeholder
 
 # %%
-import matplotlib.gridspec as gridspec 
+import matplotlib.gridspec as gridspec
 
 scatter_x = [x_mask, x_mask_wind, x_mask_wsf, x_mask_dke]
 scatter_y = [y_mask, y_mask_wind, y_mask_wsf, y_mask_dke]
@@ -1103,7 +1103,7 @@ yax = DKE_ts_masked/MKE_ts_masked
 
 # Print Days and pairs for ease
 for i in range(len(xax)):
-    print((xax[i], yax[i])) 
+    print((xax[i], yax[i]))
 
 
 # %%
@@ -1305,7 +1305,7 @@ import datetime
 import matplotlib.pyplot as plt
 
 def calculate_air_density(z,minz,maxz): #hack
-        T = 20 - 0.00649 * z;                        
+        T = 20 - 0.00649 * z;
         P = (101.29) * ((T + 273.15)/288.08)**(5.256);
         rho =  P/(0.2869*(T + 273.15));
         rho[z < minz] = 0.0
@@ -1326,7 +1326,7 @@ def upscale(yin,window):
                 yout[count,j] = np.mean(yin[i:i+window,j][m1])
         i = i + window
         count += 1
-    return yout 
+    return yout
 
 
 files = glob.glob('/home/nc153/soteria/ftp2.archive.arm.gov/chaneyn1/245518/*.nc')

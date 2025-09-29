@@ -20,6 +20,8 @@ import seaborn as sns
 import netCDF4 as nc
 import pickle
 import numpy as np
+import rasterio
+import os
 from scipy import stats
 matplotlib.rcParams['figure.dpi'] = 100
 sns.set_theme()
@@ -143,7 +145,7 @@ plt.hist(mk)
 # %%
 plt.hist(dk)
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # MsKE Redo
 
 # %%
@@ -482,5 +484,133 @@ plt.semilogy()
 # %%
 plt.scatter(hetl,MKE_ts[DKE_ts>0])
 plt.semilogy()
+
+# %%
+
+# %% [markdown]
+# # Testing New Workflow Stuff
+
+# %% [markdown]
+# ### Testing GOES holes data
+
+# %%
+fp=rasterio.open(troot+'GOES_holes/OR_ABI-L2-LSTC-M3_G16_s20172140422189_e20172140424561_c20172140426101.tif','r')
+
+# %%
+fp.index(-97.9,36.3)
+
+# %%
+data=fp.read(1)
+
+# %%
+plt.imshow(data,cmap='coolwarm')
+ll=lonlat['E37']
+xx,yy=fp.index(ll[0],ll[1])
+plt.scatter(yy,xx,color='black')
+
+# %%
+fp.xy(0,0)
+
+# %%
+fp.xy(35,35)
+
+# %%
+fpp=nc.Dataset(troot+'lidar_wind_profile/ARM/'+'sgpdlprofwind4newsC1.c1.20170515.000046.nc','r')
+print('['+str(fpp['lon'][0].data)+', '+str(fpp['lat'][0].data)+']')
+
+# %%
+lonlat
+
+# %%
+data[yy[0],xx[0]]
+
+# %%
+fp.xy(30,30)
+
+# %%
+lonlat={'E37':[-97.927376, 36.3109],
+        'E41':[-97.08639, 36.879944],
+        'E32':[-97.81987, 36.819656],
+        'E39':[-97.06912, 36.373775],
+        'C1':[-97.48658, 36.605293]}
+
+# %%
+grad=np.gradient(data)
+gradm=[np.nanmean(grad[0]),np.nanmean(grad[1])]
+
+# %%
+gradm
+
+
+# %%
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))*180/np.pi
+
+
+# %%
+angle_between([1,0],[-1,1])
+
+
+# %%
+def angle_diff(a1,a2):
+    """ Returns angle indicating how far off of parallel these two angles are degrees"""
+    abig=max(a1,a2)
+    asml=min(a1,a2)
+    if abig>180:
+        abig=abig-180
+    if asml>180:
+        asml=asml-180
+    b1=np.abs(abig-asml)
+    if b1>90:
+        b1=180-b1
+    return b1
+
+
+# %%
+
+# %%
+wdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/245518/'
+lena=[]
+mina=[]
+maxa=[]
+a100=[]
+da=[]
+for file in os.listdir(wdir):
+    fp=nc.Dataset(wdir+file,'r')
+    alt=fp['height'][:]
+    lena.append(len(alt))
+    maxa.append(np.max(alt))
+    mina.append(np.min(alt))
+    da.append(alt[1]-alt[0])
+    break
+    try:
+        a100.append(alt[100])
+    except:
+        print(file)
+
+# %%
+np.sum(a100!=2689.009)
+
+# %%
+np.sum(a100!=2689.009)
+
+# %%
+alt
+
+# %%
+alt
+
+# %%
+np.where(alt<1500)[0]
+
+# %%
+for v in fp.variables:
+    print(v)
 
 # %%

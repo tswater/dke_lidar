@@ -11,10 +11,16 @@ parmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/ARM/' # some of t
 narmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/245518/' # the other ones
 g17dir ='/home/tswater/tyche/data/dke_peter/GOES_holes/' # GOES data from 2017
 g18dir ='/home/tswater/tyche/data/dke_peter/goes_lst_hourly/' # GOES data from other years
-
+troot  ='/home/tswater/tyche/data/dke_peter/'
 
 ##########################################################
 ###################### FUNCTIONS #########################
+def shape2dims(data,dims):
+    dimout=()
+    for d in data.shape:
+        dimout=dimout+dims[d]
+    return dimout
+
 def calculate_length_scale(z,undef=-9999):
     np.random.seed(1)
     ix = np.random.randint(0,z.shape[0],1000)
@@ -70,7 +76,7 @@ def upscale(yin,window,isangle=False): # Upscaling Data?
     count = 0
     yout = 0
     nt = int(yin.shape[0]/window)
-    yout = np.ones((nt,yin.shape[1]))
+    yout = np.ones((nt,yin.shape[1]))*float('nan')
     while i < yin.shape[0]:
         for j in range(yin.shape[1]):
             m1 = yin[i:i+window,j] != -9999
@@ -200,20 +206,21 @@ out['lst_mean']=np.ones((Nd,))*float('nan')
 out['lst_std_site']=np.ones((Nd,))*float('nan')
 out['lst_lhet']=np.ones((Nd,))*float('nan')
 out['lst_a']=np.ones((Nd))*float('nan')
-out['weighting']=np.ones((Na))*float('nan')
 out['DKE_xy']=np.ones((Nd,Nh,Na))*float('nan')
 out['DKE_z']=np.ones((Nd,Nh,Na))*float('nan')
 out['MKE_xy']=np.ones((Nd,Nh,Na))*float('nan')
 out['MKE_z']=np.ones((Nd,Nh,Na))*float('nan')
 out['wind_speed']=np.ones((Nd,Nh,Na))*float('nan')
 out['wind_a']=np.ones((Nd,Nh,Na))*float('nan')
-out['sites_repo']=np.ones((Nd,Nh,Ns))*float('nan')
-out['vort']=np.ones((Nd,Nh))*float('nan')
+out['sites_repo']=np.zeros((Nd,Nh,Ns))
+out['weighting']=np.zeros((Nd,Nh,Na))*float('nan')
+out['vort']=np.ones((Nd))*float('nan')
 
 
 #################################################################
 di=0
 for k in klist:
+    print('::::'+k+':::::')
     std=[]
     lhet=[]
     tmean=[]
@@ -273,6 +280,8 @@ for k in klist:
     v=[]
     w=[]
     ug=[]
+    ua=[]
+
     for i in range(len(flist[k]['ARM'])):
         fp = nc.Dataset(flist[k]['ARM'][i],'r')
         dates=nc.num2date(fp['time'][:],units=fp['time'].units)
@@ -295,16 +304,114 @@ for k in klist:
             tmpw = upscale(tmp,4)
             tmpa = upscale(fp['wind_direction'][m,:].data,4,True)
         z = fp['height'][:]
+        if di==0:
+            out['height']=z[0:36]
+        else:
+            if np.abs(out['height'][25]-z[25])>1:
+                print('ERROR! Height Incorrect ',flush=True)
+
         fp.close()
         rho = calculate_air_density(z,0,1000)
         ug.append((tmpu**2+tmpv**2)**0.5) # horizontal wind speed
         u.append(tmpu)
         v.append(tmpv)
         w.append(tmpw)
+        ua.append(tmpa)
+
+        for h in range(11):
+            if np.sum(np.isnan(tmpu[h])|(tempu[h]<-100))>0:
+                pass
+            else:
+                s=0
+                for site in out['sites']:
+                    if site in flist[k]['ARM'][i]:
+                        out['sites_repo'][di,h,s]=1
+                    s=s+1
+
+    # make into arrays (Sites,Hours,full_height)
     u = np.array(u)
     v = np.array(v)
     w = np.array(w)
     ug = np.array(ug)
+    ua = np.array(ua)
 
+    u=u[:,:,0:Na]
+    v=v[:,:,0:Na]
+    w=w[:,:,0:Na]
+    ug=ug[:,:,0:Na]
+    ua=ua[:,:,0:Na]
+
+    u[u==-9999]=float('nan')
+    v[u==-9999]=float('nan')
+    w[u==-9999]=float('nan')
+
+    # check if number of reporting sites is the same as recorded previously
+    a=np.sum(np.isnan(u)|np.isnan(v)|np.isnan(w),axis=0)
+    b=np.sum(out['sites_repo'][di,:,:],axis=1)
+    numdiff=np.sum(a[:,0]!=b[:])
+    if numdiff>0:
+        print('ERROR: '+str(numdiff))
+
+    out['wind_a'][di,:,:]=np.rad2deg(circmean(np.deg2rad(ua),axis=0,nan_policy='omit'))
+    out['wind_speed'][di,:,:]=np.nanmean(ug,axis=0)
+
+    up2=np.nanvar(u,axis=0,ddof=1)
+    vp2=np.nanvar(v,axis=0,ddof=1)
+    wp2=np.nanvar(w,axis=0,ddof=1)
+
+    u2=np.nanmean(u,axis=0)**2
+    v2=np.nanmean(v,axis=0)**2
+    w2=np.nanmean(w,axis=0)**2
+
+    weight=rho[0:Na]*(z[1:Na+1]-z[0:Na])
+
+    out['DKE_xy'][di,:,:]=weight*0.5*(up2+vp2)
+    out['DKE_z'][di,:,:] =weight*0.5*(wp2)
+    out['MKE_xy'][di,:,:]=weight*0.5*(u2+v2)
+    out['MKE_z'][di,:,:]=weight*0.5*(w2)
+    out['weighting'][di,:,:]=weight[:]
+
+    # Now herbie vorticity stuff
+    forecast = '%04d-%02d-%02d 15:00' % (date.year,date.month,date.day) # string to herbie
+    H = Herbie(
+        forecast, # datetime
+        model='hrrr', # model
+        product='sfc', # produce name?
+        fxx=0, # lead time, want 0
+        #save_dir='/home/pjg25/tyche/data'
+        save_dir = troot+'herbie')
+
+    try:
+        ds = H.xarray(':[UV]GRD:', remove_grib=False)
+        winds = ds[2]
+        uvort = winds['u'].values[2,591:630,887:916] * (units.meter / units.second)
+        vvort = winds['v'].values[2,591:630,887:916] * (units.meter / units.second)
+        lat = winds['latitude'].values[591:630,0]
+        lon = winds['longitude'].values[0,887:916]
+        dx, dy = mpcalc.lat_lon_grid_deltas(lon, lat)
+        vort = mpcalc.vorticity(uvort, vvort, dx=dx, dy=dy)
+        for pointer in ds:
+            pointer.close()
+    except FileNotFoundError:
+        vort = 0
+    except ValueError:
+        vort = 0
+
+    vabs=np.abs(np.array(vort))
+    out['vort'][di]=np.nanmax(vabs)
 
     di=di+1
+
+fpout=nc.Dataset(troot+'lidar_lst_out.nc','w')
+fpout.createDimension('date', size=Nd)
+fpout.createDimension('hour',size=Nh)
+fpout.createDimension('height',size=Na)
+fpout.createDimension('sites',size=Ns)
+dims={Nd:'date',Nh:'hour',Na:'height',Ns:'sites'}
+
+for v in out.keys():
+    fpout.createVariable(v,'f',dimensions=shape2dim(out[v],dims))
+    fpout[v][:]=out[v][:]
+
+fpout.close()
+

@@ -145,7 +145,7 @@ plt.hist(mk)
 # %%
 plt.hist(dk)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # MsKE Redo
 
 # %%

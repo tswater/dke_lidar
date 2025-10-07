@@ -1,10 +1,22 @@
 import numpy as np
 import glob
 import numba
+from numba import jit
+from herbie import Herbie
+import pandas as pd
+import metpy.calc as mpcalc # calculate vorticity ourselves
+from metpy.units import units
 from datetime import datetime,timedelta
+import scipy
+from scipy.optimize import curve_fit
 from scipy.stats import circmean
+import netCDF4 as nc
+import rasterio
 import os
 import gstools as gs
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 #########################################################
 ############### FOLDERS ETC #############################
 parmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/ARM/' # some of the ARM profiles
@@ -12,13 +24,17 @@ narmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/245518/' # the ot
 g17dir ='/home/tswater/tyche/data/dke_peter/GOES_holes/' # GOES data from 2017
 g18dir ='/home/tswater/tyche/data/dke_peter/goes_lst_hourly/' # GOES data from other years
 troot  ='/home/tswater/tyche/data/dke_peter/'
+debug = True
 
 ##########################################################
 ###################### FUNCTIONS #########################
+def exponential(x, a, b):
+    return a * np.exp(-x/b)
+
 def shape2dims(data,dims):
     dimout=()
     for d in data.shape:
-        dimout=dimout+dims[d]
+        dimout=dimout+(dims[d],)
     return dimout
 
 def calculate_length_scale(z,undef=-9999):
@@ -178,8 +194,43 @@ for k in klist:
     elif k=='20220901':
         del flist[k]
 
-klist=list(flist.keys())
+klist0=list(flist.keys())
+klist0.sort()
+
+# Clearsky check
+di=0
+klist=[]
+
+for k in klist0:
+    # iterate through (one or two) LST files
+    isbad=True
+    for i in range(len(flist[k]['GOES'])):
+        fp=rasterio.open(flist[k]['GOES'][i])
+        data=fp.read(1)
+
+        # clear sky check basically
+        if np.sum((data<1) | (data!=data)) > 0.1*data.size:
+            pass
+        else:
+            isbad=False
+        if debug:
+            if k in ['20180704','20200916']:
+                print(flist[k])
+                print(isbad)
+    if isbad:
+        pass
+    else:
+        klist.append(k)
+
 klist.sort()
+print(len(klist))
+if debug:
+    print()
+    print(klist)
+    print()
+    print('20180704' in klist)
+    print('20200916' in klist)
+    print()
 
 ################################################################
 # Initialize Output
@@ -188,7 +239,13 @@ out={}
 out['sites']=['E37','E41','E32','E39','C1']
 out['height']=np.zeros((36,))
 out['hour']=[8,9,10,11,12,13,14,15,16,17,18]
-out['date']=klist
+dout=[]
+for k in klist:
+    dout.append(float(k))
+out['date']=dout
+
+if debug:
+    print(dout)
 
 Na=36
 Nh=11
@@ -201,6 +258,9 @@ for site in out['sites']:
     out['lon'].append(lonlat[site][0])
     out['lat'].append(lonlat[site][1])
 
+out['lon']=np.array(out['lon'][:])
+out['lat']=np.array(out['lat'][:])
+
 out['lst_std']=np.ones((Nd,))*float('nan')
 out['lst_mean']=np.ones((Nd,))*float('nan')
 out['lst_std_site']=np.ones((Nd,))*float('nan')
@@ -212,15 +272,20 @@ out['MKE_xy']=np.ones((Nd,Nh,Na))*float('nan')
 out['MKE_z']=np.ones((Nd,Nh,Na))*float('nan')
 out['wind_speed']=np.ones((Nd,Nh,Na))*float('nan')
 out['wind_a']=np.ones((Nd,Nh,Na))*float('nan')
-out['sites_repo']=np.zeros((Nd,Nh,Ns))
+out['sites_repo']=np.zeros((Nd,Nh,Na,Ns))
 out['weighting']=np.zeros((Nd,Nh,Na))*float('nan')
 out['vort']=np.ones((Nd))*float('nan')
 
+print('SETUP and PREPROCESSING COMPLETE')
+print('TOTAL days: '+str(len(klist)))
+print('Beginning processing...',flush=True)
 
 #################################################################
 di=0
 for k in klist:
     print('::::'+k+':::::')
+    #if debug:
+    #    print(flist[k])
     std=[]
     lhet=[]
     tmean=[]
@@ -228,45 +293,39 @@ for k in klist:
     xgrad=[]
     ygrad=[]
     date=datetime(int(k[0:4]),int(k[4:6]),int(k[6:8]),1)
+    print('   LST processing...',end='',flush=True)
 
     # iterate through (one or two) LST files
     for i in range(len(flist[k]['GOES'])):
         fp=rasterio.open(flist[k]['GOES'][i])
         data=fp.read(1)
 
-        # clear sky check basically
-        if np.sum((data==0) | (data!=data)) > 0.1*data.size:
-            std.append(float('nan'))
-            lhet.append(float('nan'))
-            tmean.append(float('nan'))
-            xgrad.append(float('nan'))
-            ygrad.append(float('nan'))
-            std_site.append(float('nan'))
-        else:
-            tmp = np.copy(data)
-            tmp[tmp != tmp] = np.mean(tmp[tmp == tmp])
-            tmp[tmp == 0] = np.mean(tmp[tmp != 0])
-            lst_mesoscale = scipy.ndimage.gaussian_filter(tmp, sigma=3, mode='reflect') # smoother
-            meso_lh = calculate_length_scale(lst_mesoscale,undef=0)
-            std.append(np.nanstd(lst_mesoscale))
-            lhet.append(meso_lh)
-            tmean.append(np.nanmean(lst_mesoscale))
-            grad=np.gradient(lst_mesoscale)
-            xgrad.append(np.nanmean(grad[0]))
-            ygrad.append(np.nanmean(grad[1]))
+        if np.sum((data<1) | (data!=data)) > 0.1*data.size:
+            continue
 
-            # get surface temperature at each site
-            tsites=[]
-            for ll in lonlat.keys():
-                for f in flist[k]['ARM']:
-                    if ll in f:
-                        if ll not in tmean_site.keys():
-                            tmean_site[ll]=[]
-                        loc=fp.index(*lonlat[ll])
-                        dd=lst_mesoscale[loc[1],loc[0]]
-                        tsites.append(dd)
-            std_site.append(np.nanstd(tsites))
+        tmp = np.copy(data)
+        tmp[tmp != tmp] = np.mean(tmp[tmp == tmp])
+        tmp[tmp == 0] = np.mean(tmp[tmp != 0])
+        lst_mesoscale = scipy.ndimage.gaussian_filter(tmp, sigma=3, mode='reflect') # smoother
+        meso_lh = calculate_length_scale(lst_mesoscale,undef=0)
+        std.append(np.nanstd(lst_mesoscale))
+        lhet.append(meso_lh)
+        tmean.append(np.nanmean(lst_mesoscale))
+        grad=np.gradient(lst_mesoscale)
+        xgrad.append(np.nanmean(grad[0]))
+        ygrad.append(np.nanmean(grad[1]))
+
+        # get surface temperature at each site
+        tsites=[]
+        for ll in lonlat.keys():
+            for f in flist[k]['ARM']:
+                if ll in f:
+                    loc=fp.index(*lonlat[ll])
+                    dd=lst_mesoscale[loc[1],loc[0]]
+                    tsites.append(dd)
+        std_site.append(np.nanstd(tsites))
         fp.close()
+    print('COMPLETE',flush=True)
 
     # Pull together data from the two time periods
     out['lst_lhet'][di]=np.nanmean(lhet)
@@ -282,7 +341,9 @@ for k in klist:
     ug=[]
     ua=[]
 
+    print('   LIDAR processing',end='',flush=True)
     for i in range(len(flist[k]['ARM'])):
+        print('.',end='',flush=True)
         fp = nc.Dataset(flist[k]['ARM'][i],'r')
         dates=nc.num2date(fp['time'][:],units=fp['time'].units)
         m = (dates >= datetime(date.year,date.month,date.day,13,0))
@@ -308,6 +369,7 @@ for k in klist:
             out['height']=z[0:36]
         else:
             if np.abs(out['height'][25]-z[25])>1:
+                print(out['height'][25]-z[25])
                 print('ERROR! Height Incorrect ',flush=True)
 
         fp.close()
@@ -319,15 +381,15 @@ for k in klist:
         ua.append(tmpa)
 
         for h in range(11):
-            if np.sum(np.isnan(tmpu[h])|(tempu[h]<-100))>0:
-                pass
-            else:
-                s=0
-                for site in out['sites']:
-                    if site in flist[k]['ARM'][i]:
-                        out['sites_repo'][di,h,s]=1
-                    s=s+1
+            for a in range(Na):
+                if (np.sum(np.isnan(tmpu[h,a]))+np.sum(tmpu[h,a]<-100))==0:
+                    s=0
+                    for site in out['sites']:
+                        if site in flist[k]['ARM'][i]:
+                            out['sites_repo'][di,h,a,s]=1
+                        s=s+1
 
+    print('COMPLETE')
     # make into arrays (Sites,Hours,full_height)
     u = np.array(u)
     v = np.array(v)
@@ -342,15 +404,8 @@ for k in klist:
     ua=ua[:,:,0:Na]
 
     u[u==-9999]=float('nan')
-    v[u==-9999]=float('nan')
-    w[u==-9999]=float('nan')
-
-    # check if number of reporting sites is the same as recorded previously
-    a=np.sum(np.isnan(u)|np.isnan(v)|np.isnan(w),axis=0)
-    b=np.sum(out['sites_repo'][di,:,:],axis=1)
-    numdiff=np.sum(a[:,0]!=b[:])
-    if numdiff>0:
-        print('ERROR: '+str(numdiff))
+    v[v==-9999]=float('nan')
+    w[w==-9999]=float('nan')
 
     out['wind_a'][di,:,:]=np.rad2deg(circmean(np.deg2rad(ua),axis=0,nan_policy='omit'))
     out['wind_speed'][di,:,:]=np.nanmean(ug,axis=0)
@@ -371,6 +426,7 @@ for k in klist:
     out['MKE_z'][di,:,:]=weight*0.5*(w2)
     out['weighting'][di,:,:]=weight[:]
 
+    print('   HERBIE processing...',end='',flush=True)
     # Now herbie vorticity stuff
     forecast = '%04d-%02d-%02d 15:00' % (date.year,date.month,date.day) # string to herbie
     H = Herbie(
@@ -401,6 +457,7 @@ for k in klist:
     out['vort'][di]=np.nanmax(vabs)
 
     di=di+1
+    print('COMPLETE')
 
 fpout=nc.Dataset(troot+'lidar_lst_out.nc','w')
 fpout.createDimension('date', size=Nd)
@@ -410,8 +467,19 @@ fpout.createDimension('sites',size=Ns)
 dims={Nd:'date',Nh:'hour',Na:'height',Ns:'sites'}
 
 for v in out.keys():
-    fpout.createVariable(v,'f',dimensions=shape2dim(out[v],dims))
-    fpout[v][:]=out[v][:]
+    dimout=shape2dims(np.array(out[v]),dims)
+    if v=='sites':
+        fpout.sites=out[v][:]
+    else:
+        fpout.createVariable(v,'f8',dimensions=dimout)
+        fpout[v][:]=np.array(out[v][:])
+if debug:
+    print()
+    print(dout)
+    print()
+    print(out['date'])
+    print()
+    print(fpout['date'][:])
 
 fpout.close()
 

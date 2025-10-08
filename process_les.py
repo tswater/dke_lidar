@@ -24,10 +24,10 @@ def get_les_dke(u,v,w,z,rho):
     weight=np.zeros((226,))
     for k in range(226):
         mke[k]=(np.nanmean(u[0,k,:,:])**2+np.nanmean(v[0,k,:,:])**2+np.nanmean(w[0,k,:,:])**2)*0.5
-        u[0,k,:,:]=u[0,k,:,:]-np.nanmean(u[0,k,:,:])
-        v[0,k,:,:]=v[0,k,:,:]-np.nanmean(v[0,k,:,:])
-        w[0,k,:,:]=w[0,k,:,:]-np.nanmean(w[0,k,:,:])
-        dke[k]=0.5*(np.nanvar(u[0,k,:,:])+np.nanvar(v[0,k,:,:])+np.nanvar(w[0,  k,:,:]))
+        u2=u[0,k,:,:]-np.nanmean(u[0,k,:,:])
+        v2=v[0,k,:,:]-np.nanmean(v[0,k,:,:])
+        w2=w[0,k,:,:]-np.nanmean(w[0,k,:,:])
+        dke[k]=0.5*(np.nanvar(u2)+np.nanvar(v2)+np.nanvar(w2))
     weight[1:]=z[1:]-z[0:-1]
     weight[0]=z[0]
     idx=int(np.where(z>500)[0][0])
@@ -79,13 +79,13 @@ for day in daylist:
                     tt=tt+1
                 mke=0.5*(np.mean(uu,axis=0)**2+np.mean(vv,axis=0)**2+np.mean(ww,axis=0)**2)
                 dke=0.5*(np.var(uu,axis=0)+np.var(vv,axis=0)+np.var(ww,axis=0))
-                
+
                 mke=np.sum((weight_[i,:]*mke)[0:int(idx_[i])])/np.sum(weight_[i,:][0:int(idx_[i])])
                 dke=np.sum((weight_[i,:]*dke)[0:int(idx_[i])])/np.sum(weight_[i,:][0:int(idx_[i])])
 
                 out[day[4:12]][nsz]['dkes'].append(dke)
                 out[day[4:12]][nsz]['mkes'].append(mke)
-            
+
             print('.',end='',flush=True)
             out[day[4:12]][nsz]['dke']=np.nanmedian(out[day[4:12]][nsz]['dkes'])
             out[day[4:12]][nsz]['mke']=np.nanmedian(out[day[4:12]][nsz]['mkes'])
@@ -102,6 +102,6 @@ for day in daylist:
         dke.append(np.sum(dke_[i,0:idx])/np.sum(weight_[i,0:idx]))
         mke.append(np.sum(mke_[i,0:idx])/np.sum(weight_[i,0:idx]))
     out[day[4:12]][0]={'dke':np.nanmean(dke),'mke':np.nanmean(mke)}
-    
+
 pickle.dump(out,open(outfile,'wb'))
 

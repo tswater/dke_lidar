@@ -26,16 +26,21 @@ import os
 from scipy import stats
 from mpl_toolkits.axes_grid1 import ImageGrid
 from scipy.stats import circmean,spearmanr
+from sklearn.metrics import mean_squared_error
 matplotlib.rcParams['figure.dpi'] = 300
 plt.style.use('seaborn-v0_8-deep')
 plt.rcParams.update({'figure.max_open_warning': 0})
 
 # %%
 troot='/home/tswater/tyche/data/dke_peter/'
+proot='/home/tswater/projects/dke_lidar/'
 g18dir ='/home/tswater/tyche/data/dke_peter/goes_lst_hourly/'
 parmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/ARM/' # some of the ARM profiles
 narmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/245518/' # the other ones
 fnc=nc.Dataset(troot+'lidar_lst_out.nc','r')
+fles=pickle.load(open(proot+'pickle_tsw/dke_mke_tsw.pkl','rb'))
+fles_corrs=pickle.load(open(proot+'pickle_tsw/corrs.pkl','rb'))
+fles_hets=pickle.load(open(proot+'pickle_tsw/hets.pkl','rb'))
 
 # %%
 lonlat={'E37':[-97.927376, 36.3109],
@@ -1170,19 +1175,78 @@ plt.savefig('../../plot_output/dke1/std_full_lidar_ws.png', bbox_inches = "tight
 # %%
 
 # %% [markdown]
-# # Draft
+# # LES Figure -- Rmse
 
 # %%
+klist=list(fles.keys())
+klist.sort()
+netlist=list(fles[klist[0]].keys())
+Nn=len(netlist)-1
+Nk=len(klist)
+Nit=len(fles[klist[0]][netlist[0]]['dkes'])
+
+netrmse=np.zeros((Nn,Nk))
+het_=np.zeros((Nk,))
+ell_=np.zeros((Nk,))
+rt_0=np.zeros((Nk,))
+rt_3=np.zeros((Nk,Nit))
+rt_5=np.zeros((Nk,Nit))
+rt_7=np.zeros((Nk,Nit))
+rt_10=np.zeros((Nk,Nit))
+rt_100=np.zeros((Nk,Nit))
+for i in range(Nk):
+    k=klist[i]
+    rt_0[i]=based/fles[k][0]['mke']
+    based=rt_0[i]
+    for j in range(Nn):
+        rt=np.array(fles[k][netlist[j]]['dkes'])/np.array(fles[k][netlist[j]]['mkes'])
+        netrmse[j,i]=np.sqrt(mean_squared_error([based]*Nit,rt))/based
+        if netlist[j]==3:
+            rt_3[i,:]=rt
+        if netlist[j]==5:
+            rt_5[i,:]=rt
+        if netlist[j]==7:
+            rt_7[i,:]=rt
+        if netlist[j]==10:
+            rt_10[i,:]=rt
+        if netlist[j]==100:
+            rt_100[i,:]=rt
+    
 
 # %% [markdown]
 # #### Plotting
 
 # %%
+k=klist[0]
+j=2
+plt.hist(fles[k][netlist[j]]['mkes'],bins=50)
+plt.hist(fles[k][netlist[j]]['dkes'],bins=50,alpha=.5)
+#plt.plot([rt_0[0],rt_0[0]],[0,100])
 
 # %%
+k=klist[0]
+j=25
+print(fles[k][0]['mke'])
+plt.hist(fles[k][netlist[j]]['mkes'],bins=50)
+plt.hist(fles[k][netlist[j]]['dkes'],bins=50,alpha=.5)
+
+# %%
+pos=np.array(netlist)
+plt.boxplot(netrmse.T,positions=pos[0:-1],patch_artist=True)
+plt.xscale('log')
+plt.yscale('log')
+
+# %%
+plt.hist(rt_0,bins=np.linspace(0,1,50))
+
+# %%
+print(rt_0[11])
+
+# %%
+print(klist[11])
 
 # %% [markdown]
-# # Draft
+# # LES Figure -- Scatters
 
 # %% [markdown]
 # #### Data Prep
@@ -1196,7 +1260,7 @@ plt.savefig('../../plot_output/dke1/std_full_lidar_ws.png', bbox_inches = "tight
 
 # %%
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Scratch
 
 # %%

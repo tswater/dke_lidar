@@ -861,7 +861,9 @@ fig,axs=plt.subplots(3,2,figsize=(4,6),width_ratios=[1,1.25])
 idx=2
 import matplotlib as mpl
 
-color=plt.get_cmap('Spectral')(ws/15)
+vmax=90 #15
+clabel= r'$\alpha_{T_s,u_g}$' #r'$u_g$ ($ms^{-1}$)'
+color=plt.get_cmap('Spectral')(abet/vmax)
     
 axs[0,0].scatter(xx[0,0],yy[0,0],s=5,c=color)
 axs[0,0].set_title('No Filter\n'+r'$\rho_s=$'+str(np.round(corr[0,0],3)))
@@ -874,8 +876,8 @@ axs[0,1].scatter(xx[1,idx],yy[1,idx],s=5,c=color)
 axs[0,1].semilogy()
 axs[0,1].set_title('Strong Filter\n'+r'$\rho_s=$'+str(np.round(corr[1,idx],3)))
 axs[0,1].set_ylim(.05,50)
-fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
-             ax=axs[0,1], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, vmax), cmap='Spectral'),
+             ax=axs[0,1], orientation='vertical', label=clabel)
 
 axs[1,0].scatter(xx[0,0],yy1[0,0],s=5,c=color)
 axs[1,0].set_title(r'$\rho_s=$'+str(np.round(corr1[0,0],3)))
@@ -888,8 +890,8 @@ axs[1,1].scatter(xx[1,idx],yy1[1,idx],s=5,c=color)
 axs[1,1].semilogy()
 axs[1,1].set_title(r'$\rho_s=$'+str(np.round(corr1[1,idx],3)))
 axs[1,1].set_ylim(.8,500)
-fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
-             ax=axs[1,1], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, vmax), cmap='Spectral'),
+             ax=axs[1,1], orientation='vertical', label=clabel)
 
 axs[2,0].scatter(xx[0,0],yy2[0,0],s=5,c=color)
 axs[2,0].set_title(r'$\rho_s=$'+str(np.round(corr2[0,0],3)))
@@ -902,8 +904,8 @@ axs[2,1].scatter(xx[1,idx],yy2[1,idx],s=5,c=color)
 axs[2,1].semilogy()
 axs[2,1].set_title(r'$\rho_s=$'+str(np.round(corr2[1,idx],3)))
 axs[2,1].set_ylim(1,180)
-fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
-             ax=axs[2,1], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, vmax), cmap='Spectral'),
+             ax=axs[2,1], orientation='vertical', label=clabel)
 
 axs[2,0].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
 axs[2,1].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
@@ -911,7 +913,7 @@ axs[2,1].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
 print(lims[1][0:idx+1])
 
 plt.subplots_adjust(hspace=.5,wspace=.33)
-plt.savefig('../../plot_output/dke1/filter_select3.png', bbox_inches = "tight")
+#plt.savefig('../../plot_output/dke1/filter_select_anglecolor.png', bbox_inches = "tight")
 
 # %%
 
@@ -936,7 +938,7 @@ windp=np.cos(abet)*ws
 repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
 repo=np.mean(repo,axis=(1,2))
 vort=fnc['vort'][:]
-lhet=fnc['lst_std'][:]/fnc['lst_mean'][:]#*fnc['lst_lhet'][:]
+lhet=fnc['lst_std'][:]/fnc['lst_mean'][:]*fnc['lst_lhet'][:]
 
 # %%
 Nr=4
@@ -1033,6 +1035,8 @@ for v in range(4):
 plt.savefig('../../plot_output/dke1/filter_sensitivity_full_cv.png', bbox_inches = "tight")
 
 # %%
+
+# %%
 corr.shape
 
 # %% [markdown]
@@ -1127,7 +1131,79 @@ fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spect
              ax=axs[1,3], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
 fig.subplots_adjust(hspace=.3,wspace=.1)
 
-plt.savefig('../../plot_output/dke1/het_type_sensitivity2.png', bbox_inches = "tight")
+#plt.savefig('../../plot_output/dke1/het_type_sensitivity2.png', bbox_inches = "tight")
+
+# %% [markdown]
+# ## Redo but with More!
+
+# %%
+h=16
+dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
+mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
+
+dke=dke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
+mke=mke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
+
+rat=np.nanmean(np.sum((dke/mke)[:,2:8,0:h],axis=2),axis=1)
+_mke=np.nanmean(np.sum((1/mke)[:,2:8,0:h],axis=2),axis=1)
+dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)
+ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
+winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
+lsta=fnc['lst_a'][:]
+abet=angle_diff(winda,lsta)
+windp=np.cos(abet)*ws
+repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
+repo=np.mean(repo,axis=(1,2))
+vort=fnc['vort'][:]
+lhet=fnc['lst_lhet'][:]
+cv=fnc['lst_std'][:]/fnc['lst_mean'][:]
+cv_s=fnc['lst_std_site'][:]/fnc['lst_mean'][:]
+het=lhet*cv
+m=(ws<15)&(vort<4*10**(-4))
+
+color=plt.get_cmap('Spectral')(ws/15)
+
+corr=np.zeros((3,5))
+#corr2=np.zeros((2,4))
+xx=np.ones((3,5,273))*float('nan')
+yy=np.ones((3,5,273))*float('nan')
+
+for v in range(3):
+    for j in range(5):
+        xx[v,j,m]=[cv,cv_s,lhet,het,abet][j][m]
+        yy[v,j,m]=[rat,dke_1,ws][v][m]
+        corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
+
+# %%
+fig,axs=plt.subplots(3,5,figsize=(6,4),width_ratios=[1,1,1,1,1.25])
+for i in range(3):
+    for j in range(5):
+        ax=axs[i,j]
+        ax.scatter(xx[i,j],yy[i,j],s=3,c=color)
+
+        # logscale
+        ax.semilogy()
+        ax.grid(True,color='black',linewidth=.2)
+        ax.set_title(r'$\rho_s=$'+str(np.round(corr[i,j],3)),fontsize=8)
+        
+        if j>0:
+            ax.set_yticklabels([],minor=False)
+        else:
+            ax.set_ylabel([r'$DKE/MKE$',r'$DKE$ ($kg\ s^{-2}$)',r'$u_g$ ($ms^{-1}$)'][i])
+        if i<=1:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xticklabels(ax.get_xticks(),rotation=45)
+            ax.set_xlabel([r'$CV_{full}$',r'$CV_{lidar}$',r'$\lambda_{T_s}$ ($m$)',r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)',r'$\alpha_{T_s,u_g}$'][j])
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
+             ax=axs[0,4], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
+             ax=axs[1,4], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.subplots_adjust(hspace=.3,wspace=.1)
+
+plt.savefig('../../plot_output/dke1/het_type_sensitivity_big.png', bbox_inches = "tight")
+
+# %%
 
 # %%
 
@@ -1183,9 +1259,10 @@ klist.sort()
 netlist=list(fles[klist[0]].keys())
 Nn=len(netlist)-1
 Nk=len(klist)
-Nit=len(fles[klist[0]][netlist[0]]['dkes'])
+Nit=100
 
 netrmse=np.zeros((Nn,Nk))
+dke_les=np.zeros((Nk,))
 het_=np.zeros((Nk,))
 ell_=np.zeros((Nk,))
 rt_0=np.zeros((Nk,))
@@ -1196,11 +1273,13 @@ rt_10=np.zeros((Nk,Nit))
 rt_100=np.zeros((Nk,Nit))
 for i in range(Nk):
     k=klist[i]
-    rt_0[i]=based/fles[k][0]['mke']
-    based=rt_0[i]
+    rt_0[i]=fles[k][0]['dke']/fles[k][0]['mke']
+    based=fles[k][0]['dke']
+    dke_les[i]=based
     for j in range(Nn):
         rt=np.array(fles[k][netlist[j]]['dkes'])/np.array(fles[k][netlist[j]]['mkes'])
-        netrmse[j,i]=np.sqrt(mean_squared_error([based]*Nit,rt))/based
+        #netrmse[j,i]=np.sqrt(mean_squared_error([based]*Nit,fles[k][netlist[j]]['dkes']))/based
+        netrmse[j,i]=np.sqrt(mean_squared_error([rt_0[i]]*Nit,rt))/rt_0[i]
         if netlist[j]==3:
             rt_3[i,:]=rt
         if netlist[j]==5:
@@ -1211,33 +1290,32 @@ for i in range(Nk):
             rt_10[i,:]=rt
         if netlist[j]==100:
             rt_100[i,:]=rt
-    
+
 
 # %% [markdown]
 # #### Plotting
 
 # %%
-k=klist[0]
-j=2
-plt.hist(fles[k][netlist[j]]['mkes'],bins=50)
-plt.hist(fles[k][netlist[j]]['dkes'],bins=50,alpha=.5)
-#plt.plot([rt_0[0],rt_0[0]],[0,100])
+np.nanmean(rt_3,axis=1).shape
 
 # %%
-k=klist[0]
-j=25
-print(fles[k][0]['mke'])
-plt.hist(fles[k][netlist[j]]['mkes'],bins=50)
-plt.hist(fles[k][netlist[j]]['dkes'],bins=50,alpha=.5)
+#plt.hist(rt_0,bins=np.linspace(0,2,20))
+site=6
+plt.hist(rt_3[site,:],bins=np.linspace(0,1.5,20),alpha=.5)
+plt.hist(rt_10[site,:],bins=np.linspace(0,1.5,20),alpha=.5)
+plt.hist(rt_100[site,:],bins=np.linspace(0,1.5,20),alpha=.5)
+plt.plot([rt_0[site],rt_0[site]],[0,100])
+plt.title('')
 
 # %%
 pos=np.array(netlist)
-plt.boxplot(netrmse.T,positions=pos[0:-1],patch_artist=True)
-plt.xscale('log')
-plt.yscale('log')
+plt.boxplot(netrmse.T,patch_artist=True)
+plt.title('')
+#plt.xscale('log')
+#plt.yscale('log')
 
 # %%
-plt.hist(rt_0,bins=np.linspace(0,1,50))
+plt.hist(dke_les,bins=25)
 
 # %%
 print(rt_0[11])
@@ -1252,6 +1330,7 @@ print(klist[11])
 # #### Data Prep
 
 # %%
+np.std([0,1])
 
 # %% [markdown]
 # #### Plotting
@@ -1259,6 +1338,220 @@ print(klist[11])
 # %%
 
 # %%
+
+# %%
+
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# # New Correlations with New Lengthscale
+
+# %%
+corr=np.zeros((2,4))
+corr1=np.zeros((2,4))
+corr2=np.zeros((2,4))
+xx=np.ones((2,4,273))*float('nan')
+yy=np.ones((2,4,273))*float('nan')
+yy1=np.ones((2,4,273))*float('nan')
+yy2=np.ones((2,4,273))*float('nan')
+count=np.zeros((2,4))
+h=16
+
+xyz='z'
+
+dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
+#dke=fnc['DKE_z'][:]
+mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
+#mke=fnc['MKE_z'][:]/fnc['MKE_z'][:]
+
+dke=dke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
+mke=mke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
+
+rat=np.nanmean(np.sum((dke/mke)[:,2:8,0:h],axis=2),axis=1)
+_mke=np.nanmean(np.sum((1/mke)[:,2:8,0:h],axis=2),axis=1)
+dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)
+#rat=np.nanmean(np.sum((dke)[:,2:8,0:16],axis=2),axis=1)
+ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
+ws2=np.mean(fnc['wind_speed'][:,2:8,0:h],axis=(1,2))**2 #first 200m
+winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
+lsta=fnc['lst_a'][:]
+abet=angle_diff(winda,lsta)
+windp=np.cos(abet)*ws
+repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
+repo=np.mean(repo,axis=(1,2))
+vort=fnc['vort'][:]
+lhet=fnc['lst_lhet'][:]*(1+np.sin(np.deg2rad(abet)))#*fnc['lst_std'][:]/fnc['lst_mean'][:]#
+
+lims=[[3,45,20,16e-5],[3,75,15,14e-5]]
+
+for i in range(2):
+    m=np.ones((273,)).astype(bool)
+    m=m&(rat<50)#&(ws>3)
+    m1=m&(repo>=lims[i][0])
+    m2=m1&(ws<lims[i][2])
+    m3=m2&(abet>lims[i][1])
+    m4=m3&(vort<lims[i][3])
+    ms=[m1,m2,m3,m4]
+    for j in range(4):
+        xx[i,j,ms[j]]=lhet[ms[j]]
+        yy[i,j,ms[j]]=rat[ms[j]]
+        yy1[i,j,ms[j]]=_mke[ms[j]]
+        yy2[i,j,ms[j]]=dke_1[ms[j]]
+        corr[i,j]=spearmanr(xx[i,j,:],yy[i,j,:],nan_policy='omit')[0]
+        corr1[i,j]=spearmanr(xx[i,j,:],yy1[i,j,:],nan_policy='omit')[0]
+        corr2[i,j]=spearmanr(xx[i,j,:],yy2[i,j,:],nan_policy='omit')[0]
+        count[i,j]=np.sum(ms[j])
+
+
+# %%
+fig,axs=plt.subplots(3,2,figsize=(4,6),width_ratios=[1,1.25])
+idx=3
+import matplotlib as mpl
+
+color=plt.get_cmap('Spectral')(abet/90)
+    
+axs[0,0].scatter(xx[0,0],yy[0,0],s=5,c=color)
+axs[0,0].set_title('No Filter\n'+r'$\rho_s=$'+str(np.round(corr[0,0],3)))
+axs[0,0].semilogy()
+axs[0,0].set_ylabel(r'$DKE/MKE$')
+axs[0,0].set_ylim(.05,50)
+
+axs[0,1].scatter(xx[0,0],yy[0,0],s=5,c='grey',alpha=.05)
+axs[0,1].scatter(xx[1,idx],yy[1,idx],s=5,c=color)
+axs[0,1].semilogy()
+axs[0,1].set_title('Strong Filter\n'+r'$\rho_s=$'+str(np.round(corr[1,idx],3)))
+axs[0,1].set_ylim(.05,50)
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 90), cmap='Spectral'),
+             ax=axs[0,1], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+
+axs[1,0].scatter(xx[0,0],yy1[0,0],s=5,c=color)
+axs[1,0].set_title(r'$\rho_s=$'+str(np.round(corr1[0,0],3)))
+axs[1,0].semilogy()
+axs[1,0].set_ylabel(r'$1/MKE$ ($kg^{-1}\ s^{2}$)')
+axs[1,0].set_ylim(.8,500)
+
+axs[1,1].scatter(xx[0,0],yy1[0,0],s=5,c='grey',alpha=.05)
+axs[1,1].scatter(xx[1,idx],yy1[1,idx],s=5,c=color)
+axs[1,1].semilogy()
+axs[1,1].set_title(r'$\rho_s=$'+str(np.round(corr1[1,idx],3)))
+axs[1,1].set_ylim(.8,500)
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 90), cmap='Spectral'),
+             ax=axs[1,1], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+
+axs[2,0].scatter(xx[0,0],yy2[0,0],s=5,c=color)
+axs[2,0].set_title(r'$\rho_s=$'+str(np.round(corr2[0,0],3)))
+axs[2,0].semilogy()
+axs[2,0].set_ylabel(r'$DKE$ ($kg\ s^{-2}$)')
+axs[2,0].set_ylim(1,180)
+
+axs[2,1].scatter(xx[0,0],yy2[0,0],s=5,c='grey',alpha=.05)
+axs[2,1].scatter(xx[1,idx],yy2[1,idx],s=5,c=color)
+axs[2,1].semilogy()
+axs[2,1].set_title(r'$\rho_s=$'+str(np.round(corr2[1,idx],3)))
+axs[2,1].set_ylim(1,180)
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 90), cmap='Spectral'),
+             ax=axs[2,1], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+
+axs[2,0].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
+axs[2,1].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
+
+print(lims[1][0:idx+1])
+
+plt.subplots_adjust(hspace=.5,wspace=.33)
+
+# %%
+Nr=4
+Nw=20
+Nv=20
+Na=20
+
+corr=np.zeros((3,Nr*Nw*Nv*Na))
+count=np.zeros((3,Nr*Nw*Nv*Na))
+als=[]
+vls=[]
+wls=[]
+rls=[]
+al_=np.linspace(0,85,Na)
+vl_=np.linspace(5,50,Nv)*10**(-5)
+wl_=np.linspace(2,20,Nw)
+rl_=np.array([2,3,4,5])
+for y in range(3):
+    dat=[rat,_mke,dke_1][y]
+    als=[]
+    vls=[]
+    wls=[]
+    rls=[]
+    i=0
+    for r in range(4):
+        print('.',end='',flush=True)
+        rl=rl_[r]
+        for w in range(Nw):
+            wl=wl_[w]
+            for v in range(Nv):
+                vl=vl_[v]
+                for a in range(Na):
+                    al=al_[a]
+                    m=(repo>=rl)
+                    m=m&(ws<wl)
+                    m=m&(abet>al)
+                    m=m&(vort<vl)
+                    xx=lhet[m]
+                    yy=dat[m]
+                    count[y,i]=np.sum(m)
+                    corr[y,i]=spearmanr(xx,yy,nan_policy='omit')[0]
+                    als.append(al)
+                    vls.append(vl)
+                    wls.append(wl)
+                    rls.append(rl)
+
+                    i=i+1
+
+# %%
+vs=[np.array(rls),np.array(wls),np.array(vls),np.array(als)]
+fig,axs=plt.subplots(3,4,figsize=(6,4))
+for v in range(4):
+    l_=[rl_,wl_,vl_,al_][v]
+    ls=[rls,wls,vls,als][v]
+    flip=[False,True,True,False][v]
+    xticks=[[2,3,4,5],[20,15,10,5],[.0005,.0004,.0003,.0002,.0001],[0,20,40,60,80]][v]
+    xticksl=[[2,3,4,5],[20,15,10,5],[r'$5e-4$','',r'$3e-4$','',r'$1e-4$'],[0,20,40,60,80]][v]
+    yticks=[0,.1,.2,.3,.4,.5]
+    yticksl=['','0.1','','0.3','','0.5']
+    xlabel=['MIN sites\nreporting',r'MAX $u_g$ ($ms^{-1}$)',r'MAX $|\zeta|$',r'MIN $\alpha$'][v]
+    for y in range(3):
+        ylabel=[r'$\rho_{DKE/MKE}$',r'$\rho_{1/MKE}$',r'$\rho_{DKE}$'][y]
+        ax=axs[y,v]
+        color=plt.get_cmap('nipy_spectral')(count[y,:]/273)
+        ylo=[]
+        yhi=[]
+        ym=[]
+        for j in range([Nr,Nw,Nv,Na][v]):
+            m=(ls==l_[j])&(count[y,:]>5)
+            ylo.append(np.nanpercentile(corr[y,m],25))
+            yhi.append(np.nanpercentile(corr[y,m],75))
+            ym.append(np.nanpercentile(corr[y,m],50))
+        ym=np.array(ym)
+        ylo=np.array(ylo)
+        yhi=np.array(yhi)
+        ax.plot(l_,ym,'-o',markersize=2)
+        ax.fill_between(l_,ylo,yhi,alpha=.5)
+        if flip:
+            ax.invert_xaxis()
+        ax.set_ylim(-.05,.6)
+        ax.grid(True,color='black',linewidth=.2)
+        if y<2:
+            ax.set_xticks(xticks,[])
+        else:
+            ax.set_xticks(xticks,xticksl,fontsize=8)
+            ax.set_xlabel(xlabel,fontsize=10)
+        if v==0:
+            ax.set_ylabel(ylabel)
+            ax.set_yticks(yticks,yticksl,fontsize=8)
+        else:
+            ax.set_yticks(yticks,[])
+            
+        #ax.scatter(vs[v],corr[y,:],s=5,color=color)
+
+# %%
+plt.scatter(
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Scratch

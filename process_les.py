@@ -84,8 +84,8 @@ for day in daylist:
                 dke=np.sum((weight_[i,:]*dke)[0:int(idx_[i])])/np.sum(weight_[i,:][0:int(idx_[i])])
 
                 # add 1/6th to get mean over the 6 hours
-                out[day[4:12]][nsz]['dkes'][it]=out[day[4:12]][nsz]['dkes'][it]/6+dke/6
-                out[day[4:12]][nsz]['mkes'][it]=out[day[4:12]][nsz]['mkes'][it]/6+mke/6
+                out[day[4:12]][nsz]['dkes'][it]=out[day[4:12]][nsz]['dkes'][it]+dke/6
+                out[day[4:12]][nsz]['mkes'][it]=out[day[4:12]][nsz]['mkes'][it]+mke/6
 
             print('.',end='',flush=True)
             out[day[4:12]][nsz]['dke']=np.nanmedian(out[day[4:12]][nsz]['dkes'])

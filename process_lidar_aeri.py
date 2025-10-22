@@ -24,7 +24,9 @@ narmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/245518/' # the ot
 g17dir ='/home/tswater/tyche/data/dke_peter/GOES_holes/' # GOES data from 2017
 g18dir ='/home/tswater/tyche/data/dke_peter/goes_lst_hourly/' # GOES data from other years
 troot  ='/home/tswater/tyche/data/dke_peter/'
-debug = True
+tempdir=troot+'aeri_temp/'
+fnc    =nc.Dataset(troot+'lidar_lst_out.nc','r')
+debug  = True
 
 ##########################################################
 ###################### FUNCTIONS #########################
@@ -133,7 +135,7 @@ for file in os.listdir(g17dir):
     date=datetime(int(year),1,1)+timedelta(days=int(doy)-1)
     dstr=date.strftime('%Y%m%d')
     if dstr not in flist.keys():
-        flist[dstr]={'GOES':[],'ARM':[]}
+        flist[dstr]={'GOES':[],'ARM':[],'AERI':[]}
     flist[dstr]['GOES'].append(g17dir+file)
 
 for file in os.listdir(g18dir):
@@ -143,7 +145,7 @@ for file in os.listdir(g18dir):
     date=datetime(int(file[0:4]),int(file[4:6]),int(file[6:8]))
     dstr=date.strftime('%Y%m%d')
     if dstr not in flist.keys():
-        flist[dstr]={'GOES':[],'ARM':[]}
+        flist[dstr]={'GOES':[],'ARM':[],'AERI':[]}
     flist[dstr]['GOES'].append(g18dir+file)
 
 for file in os.listdir(parmdir):
@@ -152,7 +154,7 @@ for file in os.listdir(parmdir):
     else:
         dstr=file[25:33]
     if dstr not in flist.keys():
-        flist[dstr]={'GOES':[],'ARM':[]}
+        flist[dstr]={'GOES':[],'ARM':[],'AERI':[]}
     flist[dstr]['ARM'].append(parmdir+file)
 
 for file in os.listdir(narmdir):
@@ -161,66 +163,59 @@ for file in os.listdir(narmdir):
     else:
         dstr=file[25:33]
     if dstr not in flist.keys():
-        flist[dstr]={'GOES':[],'ARM':[]}
+        flist[dstr]={'GOES':[],'ARM':[],'AERI':[]}
     flist[dstr]['ARM'].append(narmdir+file)
 
-# remove days without one or the other
-klist=list(flist.keys())
-for k in klist:
-    if len(flist[k]['ARM'])<2:
-        del flist[k]
-    elif len(flist[k]['GOES'])<1:
-        del flist[k]
-    elif int(k[4:6])<5:
-        del flist[k]
-    elif int(k[4:6])>9:
-        del flist[k]
-    elif k=='20210730':
-        del flist[k]
-    elif k=='20210828':
-        del flist[k]
-    elif k=='20220617':
-        del flist[k]
-    elif k=='20220618':
-        del flist[k]
-    elif k=='20220625':
-        del flist[k]
-    elif k=='20220808':
-        del flist[k]
-    elif k=='20220809':
-        del flist[k]
-    elif k=='20220927':
-        del flist[k]
-    elif k=='20220901':
-        del flist[k]
-
-klist0=list(flist.keys())
-klist0.sort()
-
-# Clearsky check
-di=0
-klist=[]
-
-for k in klist0:
-    # iterate through (one or two) LST files
-    isbad=True
-    for i in range(len(flist[k]['GOES'])):
-        fp=rasterio.open(flist[k]['GOES'][i])
-        data=fp.read(1)
-
-        # clear sky check basically
-        if np.sum((data<1) | (data!=data)) > 0.1*data.size:
-            pass
-        else:
-            isbad=False
-        if debug:
-            if k in ['20180704','20200916']:
-                print(flist[k])
-                print(isbad)
-    if isbad:
-        pass
+for file in os.listdir(tempdir):
+    if 'C1' in file:
+        dstr=file[20:28]
     else:
-        klist.append(k)
+        dstr=file[21:29]
+    if dstr not in flist.keys():
+        flist[dstr]={'GOES':[],'ARM':[],'AERI':[]}
+    flist[dstr]['AERI'].append(tempdir+file)
+
+klist0=fnc['date'][:]
+klist=[]
+for k in klist0:
+    dstr=str(int(k))
+    if len(flist[dstr]['AERI'])<3:
+        continue
+    else:
+        # check that there are at least three of the same sites reporting
+        # remove non-colocated instruments
+        sites=['C1','E32','E37','E39']
+        llist=[]
+        alist=[]
+        lfiles=[]
+        afiles=[]
+        for l in flist[dstr]['ARM']:
+            for site in sites:
+                if site in l:
+                    llist.append(site)
+                    lfiles.append(l)
+        for a in flist[dstr]['AERI']:
+            for site in sites:
+                if site in a:
+                    alist.append(site)
+                    afiles.append(a)
+        sitecount=0
+        lfiles2=[]
+        afiles2=[]
+        for i in range(len(llist)):
+            if llist[i] in alist:
+                lfiles2.append(lfiles[i])
+                sitecount=sitecount+1
+        for i in range(len(alist)):
+            if alist[i] in llist:
+                afiles2.append(afiles[i])
+        flist[dstr]['AERI']=afiles2
+        flist[dstr]['ARM']=lfiles2
+
+        if sitecount<3:
+            continue
+        else:
+            klist.append(dstr)
 
 klist.sort()
 print(len(klist))
@@ -228,16 +223,13 @@ if debug:
     print()
     print(klist)
     print()
-    print('20180704' in klist)
-    print('20200916' in klist)
-    print()
 
 ################################################################
 # Initialize Output
 out={}
 
-out['sites']=['E37','E41','E32','E39','C1']
-out['height']=np.zeros((36,))
+out['sites']=['E37','E32','E39','C1']
+out['height']=fnc['height'][:]
 out['hour']=[8,9,10,11,12,13,14,15,16,17,18]
 dout=[]
 for k in klist:
@@ -250,7 +242,7 @@ if debug:
 Na=36
 Nh=11
 Nd=len(klist)
-Ns=5
+Ns=4
 
 out['lon']=[]
 out['lat']=[]
@@ -261,22 +253,26 @@ for site in out['sites']:
 out['lon']=np.array(out['lon'][:])
 out['lat']=np.array(out['lat'][:])
 
+copylist=['lst_std','lst_mean','lst_lhet','lst_a','weighting','vort']
+
+out['aeri_std']=np.ones((Nd,Nh,Na))*float('nan')
 out['lst_std']=np.ones((Nd,))*float('nan')
 out['lst_mean']=np.ones((Nd,))*float('nan')
-out['lst_std_site']=np.ones((Nd,))*float('nan')
 out['lst_lhet']=np.ones((Nd,))*float('nan')
 out['lst_a']=np.ones((Nd))*float('nan')
+out['weighting']=np.zeros((Nd,Nh,Na))*float('nan')
+out['vort']=np.ones((Nd))*float('nan')
+
 out['DKE_xy']=np.ones((Nd,Nh,Na))*float('nan')
 out['DKE_z']=np.ones((Nd,Nh,Na))*float('nan')
 out['MKE_xy']=np.ones((Nd,Nh,Na))*float('nan')
 out['MKE_z']=np.ones((Nd,Nh,Na))*float('nan')
 out['wind_speed']=np.ones((Nd,Nh,Na))*float('nan')
 out['wind_a']=np.ones((Nd,Nh,Na))*float('nan')
+out['lst_std_site']=np.ones((Nd,))*float('nan')
+
 out['sites_repo']=np.zeros((Nd,Nh,Na,Ns))
-out['weighting']=np.zeros((Nd,Nh,Na))*float('nan')
-out['vort']=np.ones((Nd))*float('nan')
-out['pgrad']=np.ones((Nd))*float('nan')
-out['precip']=np.ones((Nd,Nh))*float('nan')
+
 print('SETUP and PREPROCESSING COMPLETE')
 print('TOTAL days: '+str(len(klist)))
 print('Beginning processing...',flush=True)
@@ -287,12 +283,12 @@ for k in klist:
     print('::::'+k+':::::')
     #if debug:
     #    print(flist[k])
-    std=[]
-    lhet=[]
-    tmean=[]
+
+    fncdi=np.where(fnc['date'][:]==float(k))[0][0]
+    for cop in copylist:
+        out[cop][di]=fnc[cop][fncdi]
+
     std_site=[]
-    xgrad=[]
-    ygrad=[]
     date=datetime(int(k[0:4]),int(k[4:6]),int(k[6:8]),1)
     print('   LST processing...',end='',flush=True)
 
@@ -308,13 +304,6 @@ for k in klist:
         tmp[tmp != tmp] = np.mean(tmp[tmp == tmp])
         tmp[tmp == 0] = np.mean(tmp[tmp != 0])
         lst_mesoscale = scipy.ndimage.gaussian_filter(tmp, sigma=3, mode='reflect') # smoother
-        meso_lh = calculate_length_scale(lst_mesoscale,undef=0)
-        std.append(np.nanstd(lst_mesoscale))
-        lhet.append(meso_lh)
-        tmean.append(np.nanmean(lst_mesoscale))
-        grad=np.gradient(lst_mesoscale)
-        xgrad.append(np.nanmean(grad[0]))
-        ygrad.append(np.nanmean(grad[1]))
 
         # get surface temperature at each site
         tsites=[]
@@ -324,16 +313,47 @@ for k in klist:
                     loc=fp.index(*lonlat[ll])
                     dd=lst_mesoscale[loc[1],loc[0]]
                     tsites.append(dd)
-        std_site.append(np.nanstd(tsites))
+        std_site.append(np.nanstd(tsites,ddof=1))
         fp.close()
     print('COMPLETE',flush=True)
 
     # Pull together data from the two time periods
-    out['lst_lhet'][di]=np.nanmean(lhet)
-    out['lst_std'][di]=np.nanmean(std)
-    out['lst_mean'][di]=np.nanmean(tmean)
     out['lst_std_site'][di]=np.nanmean(std_site)
-    out['lst_a'][di]=angle_between([np.nanmean(xgrad),np.nanmean(ygrad)],[1,0])
+
+    date=datetime(int(k[0:4]),int(k[4:6]),int(k[6:8]),1)
+    print('   LST processing...',end='',flush=True)
+
+    fp=nc.Dataset(tempdir+'sgpaerioe1turnE32.c1.20190904.000558.nc','r')
+    h_aeri=fp['height'][:]
+    fp.close()
+
+    # now iterate through the temperature stuff
+    temp_temp=np.ones((Nh,Na,Ns))*float('nan')
+    for i in range(len(flist[k]['AERI'])):
+        fp = nc.Dataset(flist[k]['AERI'][i],'r')
+        try:
+            time=fp['time'][:]
+        except Exception as e:
+            print(flist[k]['AERI'][i])
+            print(fp.variables.keys())
+            raise e
+        if 'height' in fp.variables.keys():
+            h_=fp['height'][:]*1000
+        else:
+            h_=h_aeri*1000
+        hidx=0
+        for hr in out['hour']:
+            t0=(hr+5)*60*60
+            tf=(hr+6)*60*60
+            m=(time>=t0)&(time<tf)
+            if np.sum(m)<1:
+                hidx=hidx+1
+                continue
+            t_=np.nanmean(fp['temperature'][m,:],axis=0)
+            temp_temp[hidx,:,i]=np.interp(out['height'][:],h_,t_)
+            hidx=hidx+1
+    for i in range(Nh):
+        out['aeri_std'][di,i,:]=np.nanstd(temp_temp[i,:,:],axis=1,ddof=1)
 
     # now iterate through the profile files
     u=[]
@@ -341,7 +361,6 @@ for k in klist:
     w=[]
     ug=[]
     ua=[]
-    precip=[]
 
     print('   LIDAR processing',end='',flush=True)
     for i in range(len(flist[k]['ARM'])):
@@ -358,9 +377,6 @@ for k in klist:
             tmp = fp['w'][m,:].data
             tmpw = upscale(tmp,6)
             tmpa = upscale(fp['wind_direction'][m,:].data,6,True)
-            pp   = fp['met_spr'][m].data
-            pp   = pp.reshape(len(pp),1)
-            tmpp = upscale(pp,6,True)
         if dates.size == 96:
             tmp = fp['u'][m,:].data
             tmpu = upscale(tmp,4)
@@ -369,9 +385,6 @@ for k in klist:
             tmp = fp['w'][m,:].data
             tmpw = upscale(tmp,4)
             tmpa = upscale(fp['wind_direction'][m,:].data,4,True)
-            pp   = fp['met_spr'][m].data
-            pp   = pp.reshape(len(pp),1)
-            tmpp = upscale(pp,4,True)
         z = fp['height'][:]
         if di==0:
             out['height']=z[0:36]
@@ -387,7 +400,6 @@ for k in klist:
         v.append(tmpv)
         w.append(tmpw)
         ua.append(tmpa)
-        precip.append(tmpp)
 
         for h in range(11):
             for a in range(Na):
@@ -405,7 +417,6 @@ for k in klist:
     w = np.array(w)
     ug = np.array(ug)
     ua = np.array(ua)
-    precip= np.array(precip)
 
     u=u[:,:,0:Na]
     v=v[:,:,0:Na]
@@ -416,12 +427,9 @@ for k in klist:
     u[u==-9999]=float('nan')
     v[v==-9999]=float('nan')
     w[w==-9999]=float('nan')
-    precip[precip==-9999]=float('nan')
-
 
     out['wind_a'][di,:,:]=np.rad2deg(circmean(np.deg2rad(ua),axis=0,nan_policy='omit'))
     out['wind_speed'][di,:,:]=np.nanmean(ug,axis=0)
-    out['precip'][di,:]=np.nanmean(precip,axis=(0,1))
 
     up2=np.nanvar(u,axis=0,ddof=1)
     vp2=np.nanvar(v,axis=0,ddof=1)
@@ -439,51 +447,10 @@ for k in klist:
     out['MKE_z'][di,:,:]=weight*0.5*(w2)
     out['weighting'][di,:,:]=weight[:]
 
-    print('   HERBIE processing...',end='',flush=True)
-    # Now herbie vorticity stuff
-    forecast = '%04d-%02d-%02d 15:00' % (date.year,date.month,date.day) # string to herbie
-    H = Herbie(
-        forecast, # datetime
-        model='hrrr', # model
-        product='sfc', # produce name?
-        fxx=0, # lead time, want 0
-        #save_dir='/home/pjg25/tyche/data'
-        save_dir = troot+'herbie')
-
-    try:
-        ds = H.xarray(':[UV]GRD:', remove_grib=False)
-        ds2= H.xarray(':PRES',remove_grib=False)
-        pres  = ds2[4]['sp'].values[591:630,887:916]
-        grad  = np.gradient(pres)
-        gx    = np.abs(np.nanmean(grad[0]))
-        gy    = np.abs(np.nanmean(grad[1]))
-        gout  = max(gx,gy)
-
-        winds = ds[2]
-        uvort = winds['u'].values[2,591:630,887:916] * (units.meter / units.second)
-        vvort = winds['v'].values[2,591:630,887:916] * (units.meter / units.second)
-        lat = winds['latitude'].values[591:630,0]
-        lon = winds['longitude'].values[0,887:916]
-        dx, dy = mpcalc.lat_lon_grid_deltas(lon, lat)
-        vort = mpcalc.vorticity(uvort, vvort, dx=dx, dy=dy)
-        for pointer in ds:
-            pointer.close()
-    except FileNotFoundError:
-        vort = 0
-    except ValueError:
-        vort = 0
-    except Exception:
-        vort = 0
-        gout = -.0001
-
-    vabs=np.abs(np.array(vort))
-    out['vort'][di]=np.nanmax(vabs)
-    out['pgrad'][di]=gout
-
     di=di+1
     print('COMPLETE')
 
-fpout=nc.Dataset(troot+'lidar_lst_out2.nc','w')
+fpout=nc.Dataset(troot+'lidar_tprof.nc','w')
 fpout.createDimension('date', size=Nd)
 fpout.createDimension('hour',size=Nh)
 fpout.createDimension('height',size=Na)

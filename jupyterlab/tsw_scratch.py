@@ -33,9 +33,9 @@ plt.rcParams.update({'figure.max_open_warning': 0})
 # %%
 proot='/home/tswater/projects/dke_lidar/'
 troot='/home/tswater/tyche/data/dke_peter/'
-with open(proot+'/pickle_network/20150606dke.pkl', 'rb') as file:
+with open(proot+'/old_pickle_network/20150606dke.pkl', 'rb') as file:
     p20150606dke = pickle.load(file)
-with open(proot+'/pickle_network/20150606.pkl', 'rb') as file:
+with open(proot+'/old_pickle_network/20150606.pkl', 'rb') as file:
     p20150606 = pickle.load(file)
 
 # %%
@@ -149,7 +149,7 @@ plt.hist(mk)
 # %%
 plt.hist(dk)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # MsKE Redo
 
 # %%
@@ -470,6 +470,17 @@ MKE_ts = np.array(MKE_ts)
 ug_ts = np.array(ug_ts)
 
 # %%
+ds = H.xarray(':[UV]GRD:', remove_grib=False)
+
+# %%
+ds[2]
+
+# %%
+ds[2]['isobaricInhPa']
+
+# %%
+
+# %%
 hetl=lst_lscale_ts.data[lst_lscale_ts>0][0:-5][DKE_ts>0]
 
 # %%
@@ -508,12 +519,19 @@ data=fp.read(1)
 
 # %%
 plt.imshow(data,cmap='coolwarm')
-ll=lonlat['E37']
-xx,yy=fp.index(ll[0],ll[1])
-plt.scatter(yy,xx,color='black')
 
 # %%
-fp.xy(0,0)
+from scipy.ndimage import rotate
+
+# %%
+data[np.isnan(data)]=np.nanmean(data)
+out=rotate(data,45,cval=float('nan'))
+
+# %%
+plt.imshow(out,cmap='coolwarm')
+
+# %%
+out[25,25]
 
 # %%
 fp.xy(35,35)

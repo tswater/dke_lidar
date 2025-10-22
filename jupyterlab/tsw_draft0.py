@@ -27,7 +27,7 @@ from scipy import stats
 from mpl_toolkits.axes_grid1 import ImageGrid
 from scipy.stats import circmean,spearmanr
 from sklearn.metrics import mean_squared_error
-matplotlib.rcParams['figure.dpi'] = 300
+matplotlib.rcParams['figure.dpi'] = 500
 plt.style.use('seaborn-v0_8-deep')
 plt.rcParams.update({'figure.max_open_warning': 0})
 
@@ -37,7 +37,8 @@ proot='/home/tswater/projects/dke_lidar/'
 g18dir ='/home/tswater/tyche/data/dke_peter/goes_lst_hourly/'
 parmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/ARM/' # some of the ARM profiles
 narmdir='/home/tswater/tyche/data/dke_peter/lidar_wind_profile/245518/' # the other ones
-fnc=nc.Dataset(troot+'lidar_lst_out.nc','r')
+fnc=nc.Dataset(troot+'lidar_lst_out2.nc','r')
+fnt=nc.Dataset(troot+'lidar_tprof.nc','r')
 fles=pickle.load(open(proot+'pickle_tsw/dke_mke_tsw.pkl','rb'))
 fles_corrs=pickle.load(open(proot+'pickle_tsw/corrs.pkl','rb'))
 fles_hets=pickle.load(open(proot+'pickle_tsw/hets.pkl','rb'))
@@ -137,11 +138,13 @@ fpu=nc.Dataset(wdir+htdir+hr2,'r')
 fpt=nc.Dataset(bdir+htdir+hr_,'r')
 het_su[10:,:]=fpu['AVV_V'][0,0:100,:,350]
 het_tsf[0,:]=fpt['AVS_TSK'][0,:,350]
+het_norm=np.nanmean(fpu['AVV_V'][0,0:40,:,:])
 
 fpu=nc.Dataset(wdir+hgdir+hr2,'r')
 fpt=nc.Dataset(bdir+hgdir+hr_,'r')
 hmg_su[10:,:]=fpu['AVV_V'][0,0:100,:,350]
 hmg_tsf[0,:]=fpt['AVS_TSK'][0,:,350]
+hmg_norm=np.nanmean(fpu['AVV_V'][0,0:40,:,:])
 
 for i in range(10):
     het_tsf[i,:]=het_tsf[0,:]
@@ -149,10 +152,12 @@ for i in range(10):
 
 hmg_su[10:]=scipy.ndimage.gaussian_filter(hmg_su[10:], sigma=2, mode='reflect') # smoother
 het_su[10:]=scipy.ndimage.gaussian_filter(het_su[10:], sigma=2, mode='reflect')
-hmg_su[:]=hmg_su[:]-np.nanmean(hmg_su[0:40,:])
-het_su[:]=het_su[:]-np.nanmean(het_su[0:40,:])
+hmg_su[:]=hmg_su[:]-hmg_norm
+het_su[:]=het_su[:]-hmg_norm
 
 # %%
+fpg.close()
+fpt.close()
 
 # %% [markdown]
 # #### Plotting
@@ -339,7 +344,7 @@ cb=fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(-4, 4), cmap=cma
 cb.ax.tick_params(labelsize=fnts)
 cb.set_label(label=r'$u$ ($ms^{-1}$)',size=fntn)
 
-plt.savefig('../../plot_output/dke1/les_prof_cmb.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/les_prof_cmb2.png', bbox_inches = "tight")
 
 # %%
 
@@ -375,6 +380,7 @@ goes=[]
 lhet=[]
 std=[]
 wdir=[]
+wdir2=[{},{},{}]
 
 for d in days:
     didx.append(np.where(float(d)==fnc['date'][:].data)[0][0])
@@ -723,8 +729,114 @@ gz[1].text(-.5,37,'d)',fontsize=8)
 plt.savefig('../../plot_output/dke1/lidar_prof_time_ratio.png', bbox_inches = "tight")
 
 # %%
-len(fnc['date'][:])
+##### SETUP
+version=['dke','dke_mke'][1]
+cmap='nipy_spectral'
+mn=2
+mx=98
+fig=plt.figure(figsize=(5.5,2))
+subfigs = fig.subfigures(1, 1, hspace=0,wspace=0,frameon=False,height_ratios=[1])
+gxy=ImageGrid(subfigs, 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=0.1,
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
 
+height=fnc['height'][:]
+time=fnc['hour'][:].astype(int)
+
+##### Final Data Prep
+if version=='dke':
+    d_xyl=np.nanmean(dxylo,axis=0)
+    d_xyh=np.nanmean(dxyhi,axis=0)
+    d_zl=np.nanmean(dzlo,axis=0)
+    d_zh=np.nanmean(dzhi,axis=0)
+    clabelxy=r'$DKE_{xy}$ ($m^{2}\ s^{-2}$)'
+    clabelz=r'$DKE_{z}$ ($m^{2}\ s^{-2}$)'
+elif version=='dke_mke':
+    d_xyl=np.nanmedian((dxylo+dzlo)/(mxylo+mzlo),axis=0)
+    d_xyh=np.nanmedian((dxyhi+dzhi)/(mxyhi+mzhi),axis=0)
+    clabelxy=r'$DKE/MKE$'
+
+vmn_xy=min(np.nanpercentile(d_xyl,mn),np.nanpercentile(d_xyh,mn))
+vmx_xy=max(np.nanpercentile(d_xyl,mx),np.nanpercentile(d_xyh,mx))
+
+xticks=np.linspace(0,len(time)-1,len(time))
+xticks_l=['8:00','','10:00','','12:00','','14:00','','16:00','','18:00']
+yticks=[0.4,4.2,8,11.8,15.6,19.6,23.4,27.25,31]
+yticks_l=['','200','','400','','600','','800','']
+
+##### Plotting Top
+gxy[0].imshow(d_xyl.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_xy,vmax=vmx_xy,interpolation='spline16')
+im=gxy[1].imshow(d_xyh.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_xy,vmax=vmx_xy,interpolation='spline16')
+
+#gxy[1].set_xticks([0,3,6,9],[])
+#gxy[0].set_xticks([0,3,6,9],[])
+#gxy[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
+#gxy[1].set_yticks([4.2,11.8,19.6,27.25])
+
+gxy[0].set_xticks(xticks,xticks_l,rotation=45)
+gxy[1].set_xticks(xticks,xticks_l,rotation=45)
+gxy[0].set_yticks(yticks,yticks_l)
+gxy[1].set_yticks(yticks,yticks_l)
+
+
+gxy[0].set_title('Less Heterogeneous',fontsize=10)
+gxy[1].set_title('Very Heterogeneous',fontsize=10)
+gxy[0].tick_params(labelsize=8)
+gxy[1].tick_params(labelsize=8)
+gxy[0].set_ylabel(r'Height $(m)$',fontsize=8)
+gxy[0].grid(True,alpha=1,color='black',linewidth=.1)
+gxy[1].grid(True,alpha=1,color='black',linewidth=.1)
+gxy[0].set_xlabel('Local Hour',fontsize=8)
+gxy[1].set_xlabel('Local Hour',fontsize=8)
+
+cb=gxy.cbar_axes[0].colorbar(im)
+gxy.cbar_axes[0].tick_params(labelsize=8)
+cb.set_label(label=clabelxy,size=8)
+
+
+#### Add Figure Labeling
+gxy[0].text(-.5,37,'a)',fontsize=8)
+gxy[1].text(-.5,37,'b)',fontsize=8)
+
+plt.savefig('../../plot_output/dke1/lidar_prof_time_ratio_full.png', bbox_inches = "tight")
+
+# %% [markdown]
+# # Data for Next Couple
+
+# %%
+h=16
+
+dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
+mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
+wfac=np.nanmean(np.sum((fnc['weighting'][:,:,:])[:,2:8,0:h],axis=2),axis=1)
+
+_mke=1/(np.nanmean(np.sum((mke)[:,2:8,0:h],axis=2),axis=1)/wfac)
+dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)/wfac
+rat=_mke*dke_1
+
+ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
+ws2=np.mean(fnc['wind_speed'][:,2:8,-2],axis=(1)) #1000m
+winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
+lsta=fnc['lst_a'][:]
+abet=angle_diff(winda,lsta)
+windp=np.cos(abet)*ws
+repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
+repo=np.mean(repo,axis=(1,2))
+vort=fnc['vort'][:]
+lhet=fnc['lst_std'][:]/fnc['lst_mean'][:]*fnc['lst_lhet'][:]
+cv=fnc['lst_std'][:]/fnc['lst_mean'][:]
+cv_s=fnc['lst_std_site'][:]/fnc['lst_mean'][:]
+lhet_0=fnc['lst_lhet'][:]
+rain=np.nanmean(fnc['precip'][:,2:8],axis=1)
+rain[rain>0]=2
+rain[np.isnan(rain)]=1
+
+
+# %%
 
 # %% [markdown]
 # # Progressive Filtering
@@ -761,57 +873,30 @@ def angle_diff(a1,a2):
 
 
 # %%
-np.cumsum(fnc['weighting'][:],axis=2).shape
+np.nanmean(fnc['weighting'][:])
 
 # %%
-corr=np.zeros((2,4))
-corr1=np.zeros((2,4))
-corr2=np.zeros((2,4))
-xx=np.ones((2,4,273))*float('nan')
-yy=np.ones((2,4,273))*float('nan')
-yy1=np.ones((2,4,273))*float('nan')
-yy2=np.ones((2,4,273))*float('nan')
-count=np.zeros((2,4))
-h=16
+corr=np.zeros((2,5))
+corr1=np.zeros((2,5))
+corr2=np.zeros((2,5))
+xx=np.ones((2,5,273))*float('nan')
+yy=np.ones((2,5,273))*float('nan')
+yy1=np.ones((2,5,273))*float('nan')
+yy2=np.ones((2,5,273))*float('nan')
+count=np.zeros((2,5))
 
-xyz='z'
-
-dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
-#dke=fnc['DKE_z'][:]
-mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
-#mke=fnc['MKE_z'][:]/fnc['MKE_z'][:]
-
-dke=dke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
-mke=mke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
-
-rat=np.nanmean(np.sum((dke/mke)[:,2:8,0:h],axis=2),axis=1)
-_mke=np.nanmean(np.sum((1/mke)[:,2:8,0:h],axis=2),axis=1)
-dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)
-#rat=np.nanmean(np.sum((dke)[:,2:8,0:16],axis=2),axis=1)
-ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
-ws2=np.mean(fnc['wind_speed'][:,2:8,0:h],axis=(1,2))**2 #first 200m
-winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
-lsta=fnc['lst_a'][:]
-abet=angle_diff(winda,lsta)
-windp=np.cos(abet)*ws
-repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
-repo=np.mean(repo,axis=(1,2))
-vort=fnc['vort'][:]
-lhet=fnc['lst_lhet'][:]*fnc['lst_std'][:]/fnc['lst_mean'][:]
-
-color=plt.get_cmap('nipy_spectral')(ws/np.max(ws))
-
-lims=[[3,60,20,16e-5],[3,70,15,14e-5]]
+lims=[[3,60,20,1,16e-5],[3,70,15,0,25e-5]]
 
 for i in range(2):
     m=np.ones((273,)).astype(bool)
     m=m&(rat<50)#&(ws>3)
     m1=m&(repo>=lims[i][0])
-    m2=m1&(ws<lims[i][2])
+    m2=m1&(ws2<lims[i][2])
     m3=m2&(abet>lims[i][1])
-    m4=m3&(vort<lims[i][3])
-    ms=[m1,m2,m3,m4]
-    for j in range(4):
+    m4=m3&(rain<=lims[i][3])
+    m5=m4&(vort<lims[i][4])
+    ms=[m1,m2,m3,m4,m5]
+    for j in range(5):
         xx[i,j,ms[j]]=lhet[ms[j]]
         yy[i,j,ms[j]]=rat[ms[j]]
         yy1[i,j,ms[j]]=_mke[ms[j]]
@@ -823,6 +908,8 @@ for i in range(2):
 
 
 
+
+# %%
 
 # %%
 
@@ -858,52 +945,52 @@ axs.shape
 
 # %%
 fig,axs=plt.subplots(3,2,figsize=(4,6),width_ratios=[1,1.25])
-idx=2
+idx=4
 import matplotlib as mpl
 
-vmax=90 #15
-clabel= r'$\alpha_{T_s,u_g}$' #r'$u_g$ ($ms^{-1}$)'
-color=plt.get_cmap('Spectral')(abet/vmax)
+vmax=15
+clabel= r'$u_g$ ($ms^{-1}$)'
+color=plt.get_cmap('Spectral')(ws2/vmax)
     
 axs[0,0].scatter(xx[0,0],yy[0,0],s=5,c=color)
 axs[0,0].set_title('No Filter\n'+r'$\rho_s=$'+str(np.round(corr[0,0],3)))
 axs[0,0].semilogy()
 axs[0,0].set_ylabel(r'$DKE/MKE$')
-axs[0,0].set_ylim(.05,50)
+#axs[0,0].set_ylim(.05,50)
 
 axs[0,1].scatter(xx[0,0],yy[0,0],s=5,c='grey',alpha=.05)
 axs[0,1].scatter(xx[1,idx],yy[1,idx],s=5,c=color)
 axs[0,1].semilogy()
 axs[0,1].set_title('Strong Filter\n'+r'$\rho_s=$'+str(np.round(corr[1,idx],3)))
-axs[0,1].set_ylim(.05,50)
+#axs[0,1].set_ylim(.05,50)
 fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, vmax), cmap='Spectral'),
              ax=axs[0,1], orientation='vertical', label=clabel)
 
 axs[1,0].scatter(xx[0,0],yy1[0,0],s=5,c=color)
 axs[1,0].set_title(r'$\rho_s=$'+str(np.round(corr1[0,0],3)))
 axs[1,0].semilogy()
-axs[1,0].set_ylabel(r'$1/MKE$ ($kg^{-1}\ s^{2}$)')
-axs[1,0].set_ylim(.8,500)
+axs[1,0].set_ylabel(r'$1/MKE$ ($m^{-2}\ s^{2}$)')
+#axs[1,0].set_ylim(.000005,.002)
 
 axs[1,1].scatter(xx[0,0],yy1[0,0],s=5,c='grey',alpha=.05)
 axs[1,1].scatter(xx[1,idx],yy1[1,idx],s=5,c=color)
 axs[1,1].semilogy()
 axs[1,1].set_title(r'$\rho_s=$'+str(np.round(corr1[1,idx],3)))
-axs[1,1].set_ylim(.8,500)
+#axs[1,1].set_ylim(.000005,.002)
 fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, vmax), cmap='Spectral'),
              ax=axs[1,1], orientation='vertical', label=clabel)
 
 axs[2,0].scatter(xx[0,0],yy2[0,0],s=5,c=color)
 axs[2,0].set_title(r'$\rho_s=$'+str(np.round(corr2[0,0],3)))
 axs[2,0].semilogy()
-axs[2,0].set_ylabel(r'$DKE$ ($kg\ s^{-2}$)')
-axs[2,0].set_ylim(1,180)
+axs[2,0].set_ylabel(r'$DKE$ ($m^{2}\ s^{-2}$)')
+#axs[2,0].set_ylim(.2,70)
 
 axs[2,1].scatter(xx[0,0],yy2[0,0],s=5,c='grey',alpha=.05)
 axs[2,1].scatter(xx[1,idx],yy2[1,idx],s=5,c=color)
 axs[2,1].semilogy()
 axs[2,1].set_title(r'$\rho_s=$'+str(np.round(corr2[1,idx],3)))
-axs[2,1].set_ylim(1,180)
+#axs[2,1].set_ylim(.2,70)
 fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, vmax), cmap='Spectral'),
              ax=axs[2,1], orientation='vertical', label=clabel)
 
@@ -913,92 +1000,80 @@ axs[2,1].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
 print(lims[1][0:idx+1])
 
 plt.subplots_adjust(hspace=.5,wspace=.33)
-#plt.savefig('../../plot_output/dke1/filter_select_anglecolor.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/filter_select_v5.png', bbox_inches = "tight")
 
 # %%
+np.where(dke_1>10)[0]
 
 # %% [markdown]
-# # Check Correlations 2 Electric Boogalooo
-
-# %%
-dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
-#dke=fnc['DKE_z'][:]
-mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
-#mke=fnc['MKE_z'][:]/fnc['MKE_z'][:]
-rat=np.nanmean(np.sum((dke/mke)[:,2:8,0:h],axis=2),axis=1)
-_mke=np.nanmean(np.sum((1/mke)[:,2:8,0:h],axis=2),axis=1)
-dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)
-#rat=np.nanmean(np.sum((dke)[:,2:8,0:16],axis=2),axis=1)
-ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
-ws2=np.mean(fnc['wind_speed'][:,2:8,0:h],axis=(1,2))**2 #first 200m
-winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
-lsta=fnc['lst_a'][:]
-abet=angle_diff(winda,lsta)
-windp=np.cos(abet)*ws
-repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
-repo=np.mean(repo,axis=(1,2))
-vort=fnc['vort'][:]
-lhet=fnc['lst_std'][:]/fnc['lst_mean'][:]*fnc['lst_lhet'][:]
+# # Check Correlations -- Sensitivity
 
 # %%
 Nr=4
 Nw=20
 Nv=20
 Na=20
+Ns=2
 
-corr=np.zeros((3,Nr*Nw*Nv*Na))
-count=np.zeros((3,Nr*Nw*Nv*Na))
-als=[]
-vls=[]
-wls=[]
-rls=[]
+
+corr=np.zeros((3,Nr*Nw*Nv*Na*Ns))
+count=np.zeros((3,Nr*Nw*Nv*Na*Ns))
 al_=np.linspace(0,85,Na)
-vl_=np.linspace(5,50,Nv)*10**(-5)
-wl_=np.linspace(2,20,Nw)
+vl_=np.linspace(8,35,Nv-1)
+vl_=np.append(vl_,50)
+vl_=vl_*10**(-5)
+wl_=np.linspace(5,15,Nw-2)
+wl_=np.append(wl_,[17.5,20])
 rl_=np.array([2,3,4,5])
+sl_=[0,2]
 for y in range(3):
     dat=[rat,_mke,dke_1][y]
     als=[]
     vls=[]
     wls=[]
     rls=[]
+    sls=[]
     i=0
-    for r in range(4):
+    for r in range(Nr):
         print('.',end='',flush=True)
         rl=rl_[r]
-        for w in range(Nw):
-            wl=wl_[w]
-            for v in range(Nv):
-                vl=vl_[v]
-                for a in range(Na):
-                    al=al_[a]
-                    m=(repo>=rl)
-                    m=m&(ws<wl)
-                    m=m&(abet>al)
-                    m=m&(vort<vl)
-                    xx=lhet[m]
-                    yy=dat[m]
-                    count[y,i]=np.sum(m)
-                    corr[y,i]=spearmanr(xx,yy,nan_policy='omit')[0]
-                    als.append(al)
-                    vls.append(vl)
-                    wls.append(wl)
-                    rls.append(rl)
-
-                    i=i+1
+        for s in range(Ns):
+            sl=sl_[s]
+            for w in range(Nw):
+                wl=wl_[w]
+                for v in range(Nv):
+                    vl=vl_[v]
+                    for a in range(Na):
+                        al=al_[a]
+                        m=(repo>=rl)
+                        m=m&(ws2<wl)
+                        m=m&(abet>al)
+                        m=m&(vort<vl)
+                        m=m&(rain<=sl)
+                        xx=lhet[m]
+                        yy=dat[m]
+                        count[y,i]=np.sum(m)
+                        corr[y,i]=spearmanr(xx,yy,nan_policy='omit')[0]
+                        als.append(al)
+                        vls.append(vl)
+                        wls.append(wl)
+                        rls.append(rl)
+                        sls.append(sl)
+    
+                        i=i+1
 
 # %%
-vs=[np.array(rls),np.array(wls),np.array(vls),np.array(als)]
-fig,axs=plt.subplots(3,4,figsize=(6,4))
-for v in range(4):
-    l_=[rl_,wl_,vl_,al_][v]
-    ls=[rls,wls,vls,als][v]
-    flip=[False,True,True,False][v]
-    xticks=[[2,3,4,5],[20,15,10,5],[.0005,.0004,.0003,.0002,.0001],[0,20,40,60,80]][v]
-    xticksl=[[2,3,4,5],[20,15,10,5],[r'$5e-4$','',r'$3e-4$','',r'$1e-4$'],[0,20,40,60,80]][v]
-    yticks=[0,.1,.2,.3,.4,.5]
-    yticksl=['','0.1','','0.3','','0.5']
-    xlabel=['MIN sites\nreporting',r'MAX $u_g$ ($ms^{-1}$)',r'MAX $|\zeta|$',r'MIN $\alpha$'][v]
+fig,axs=plt.subplots(3,5,figsize=(6,3))
+for v in range(5):
+    l_=[sl_,rl_,wl_,vl_,al_][v]
+    ls=[sls,rls,wls,vls,als][v]
+    ls=np.array(ls)
+    flip=[True,False,True,True,False][v]
+    xticks=[[0,2],[2,3,4,5],[20,15,10,5],[.0005,.0004,.0003,.0002,.0001],[0,20,40,60,80]][v]
+    xticksl=[['0',r'$\infty$'],[2,3,4,5],[20,15,10,5],[r'$5e-4$','','','',r'$1e-4$'],[0,20,40,60,80]][v]
+    yticks=[.1,.2,.3,.4,.5]
+    yticksl=['0.1','','0.3','','0.5']
+    xlabel=[r'MAX Precip.'+'\n'+r'($mm$)','MIN sites\nreporting',r'MAX $u_g$ ($ms^{-1}$)',r'MAX $|\zeta|$',r'MIN $\alpha$'][v]
     for y in range(3):
         ylabel=[r'$\rho_{DKE/MKE}$',r'$\rho_{1/MKE}$',r'$\rho_{DKE}$'][y]
         ax=axs[y,v]
@@ -1006,19 +1081,24 @@ for v in range(4):
         ylo=[]
         yhi=[]
         ym=[]
-        for j in range([Nr,Nw,Nv,Na][v]):
-            m=(ls==l_[j])&(count[y,:]>5)
-            ylo.append(np.nanpercentile(corr[y,m],25))
-            yhi.append(np.nanpercentile(corr[y,m],75))
-            ym.append(np.nanpercentile(corr[y,m],50))
+        for j in range([Ns,Nr,Nw,Nv,Na][v]):
+            m=(ls==l_[j])&(count[y,:]>10)
+            if np.sum(m)<200:
+                ym.append(float('nan'))
+                ylo.append(float('nan'))
+                yhi.append(float('nan'))
+            else:
+                ylo.append(np.nanpercentile(corr[y,m],25))
+                yhi.append(np.nanpercentile(corr[y,m],75))
+                ym.append(np.nanpercentile(corr[y,m],50))
         ym=np.array(ym)
         ylo=np.array(ylo)
         yhi=np.array(yhi)
-        ax.plot(l_,ym,'-o',markersize=2)
-        ax.fill_between(l_,ylo,yhi,alpha=.5)
+        ax.plot(l_,ym,'-o',markersize=2,linewidth=.75,color='darkgreen')
+        ax.fill_between(l_,ylo,yhi,alpha=.5,color='darkgreen')
         if flip:
             ax.invert_xaxis()
-        ax.set_ylim(-.05,.6)
+        ax.set_ylim(.075,.6)
         ax.grid(True,color='black',linewidth=.2)
         if y<2:
             ax.set_xticks(xticks,[])
@@ -1030,14 +1110,10 @@ for v in range(4):
             ax.set_yticks(yticks,yticksl,fontsize=8)
         else:
             ax.set_yticks(yticks,[])
-            
         #ax.scatter(vs[v],corr[y,:],s=5,color=color)
-plt.savefig('../../plot_output/dke1/filter_sensitivity_full_cv.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/filter_sensitivity_precip2.png', bbox_inches = "tight")
 
 # %%
-
-# %%
-corr.shape
 
 # %% [markdown]
 # # DKE vs Alpha
@@ -1063,31 +1139,10 @@ corr.shape
 # #### Data Prep
 
 # %%
-h=16
-dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
-mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
+m=(ws2<15)&(abet>70)&(repo>=3)&(vort<2.5*10**(-4))&(rain<=0)
 
-dke=dke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
-mke=mke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
 
-rat=np.nanmean(np.sum((dke/mke)[:,2:8,0:h],axis=2),axis=1)
-_mke=np.nanmean(np.sum((1/mke)[:,2:8,0:h],axis=2),axis=1)
-dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)
-ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
-winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
-lsta=fnc['lst_a'][:]
-abet=angle_diff(winda,lsta)
-windp=np.cos(abet)*ws
-repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
-repo=np.mean(repo,axis=(1,2))
-vort=fnc['vort'][:]
-lhet=fnc['lst_lhet'][:]
-cv=fnc['lst_std'][:]/fnc['lst_mean'][:]
-cv_s=fnc['lst_std_site'][:]/fnc['lst_mean'][:]
-het=lhet*cv
-m=(ws<15)&(abet>70)&(repo>=3)&(vort<4*10**(-4))
-
-color=plt.get_cmap('Spectral')(ws/15)
+color=plt.get_cmap('Spectral')(ws2/15)
 
 corr=np.zeros((2,4))
 #corr2=np.zeros((2,4))
@@ -1096,7 +1151,7 @@ yy=np.ones((2,4,273))*float('nan')
 
 for v in range(2):
     for j in range(4):
-        xx[v,j,m]=[cv,cv_s,lhet,het][j][m]
+        xx[v,j,m]=[cv,cv_s,lhet_0,lhet][j][m]
         yy[v,j,m]=[rat,dke_1][v][m]
         corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
 
@@ -1105,7 +1160,7 @@ for v in range(2):
 # #### Plotting
 
 # %%
-fig,axs=plt.subplots(2,4,figsize=(6,4),width_ratios=[1,1,1,1.25])
+fig,axs=plt.subplots(2,4,figsize=(6,3),width_ratios=[1,1,1,1.25])
 for i in range(2):
     for j in range(4):
         ax=axs[i,j]
@@ -1119,7 +1174,7 @@ for i in range(2):
         if j>0:
             ax.set_yticklabels([],minor=False)
         else:
-            ax.set_ylabel([r'$DKE/MKE$',r'$DKE$ ($kg\ s^{-2}$)'][i])
+            ax.set_ylabel([r'$DKE/MKE$',r'$DKE$ ($m^2\ s^{-2}$)'][i])
         if i==0:
             ax.set_xticklabels([])
         else:
@@ -1131,77 +1186,7 @@ fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spect
              ax=axs[1,3], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
 fig.subplots_adjust(hspace=.3,wspace=.1)
 
-#plt.savefig('../../plot_output/dke1/het_type_sensitivity2.png', bbox_inches = "tight")
-
-# %% [markdown]
-# ## Redo but with More!
-
-# %%
-h=16
-dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
-mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
-
-dke=dke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
-mke=mke/np.cumsum(fnc['weighting'][:,:,:],axis=2)
-
-rat=np.nanmean(np.sum((dke/mke)[:,2:8,0:h],axis=2),axis=1)
-_mke=np.nanmean(np.sum((1/mke)[:,2:8,0:h],axis=2),axis=1)
-dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)
-ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
-winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
-lsta=fnc['lst_a'][:]
-abet=angle_diff(winda,lsta)
-windp=np.cos(abet)*ws
-repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
-repo=np.mean(repo,axis=(1,2))
-vort=fnc['vort'][:]
-lhet=fnc['lst_lhet'][:]
-cv=fnc['lst_std'][:]/fnc['lst_mean'][:]
-cv_s=fnc['lst_std_site'][:]/fnc['lst_mean'][:]
-het=lhet*cv
-m=(ws<15)&(vort<4*10**(-4))
-
-color=plt.get_cmap('Spectral')(ws/15)
-
-corr=np.zeros((3,5))
-#corr2=np.zeros((2,4))
-xx=np.ones((3,5,273))*float('nan')
-yy=np.ones((3,5,273))*float('nan')
-
-for v in range(3):
-    for j in range(5):
-        xx[v,j,m]=[cv,cv_s,lhet,het,abet][j][m]
-        yy[v,j,m]=[rat,dke_1,ws][v][m]
-        corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
-
-# %%
-fig,axs=plt.subplots(3,5,figsize=(6,4),width_ratios=[1,1,1,1,1.25])
-for i in range(3):
-    for j in range(5):
-        ax=axs[i,j]
-        ax.scatter(xx[i,j],yy[i,j],s=3,c=color)
-
-        # logscale
-        ax.semilogy()
-        ax.grid(True,color='black',linewidth=.2)
-        ax.set_title(r'$\rho_s=$'+str(np.round(corr[i,j],3)),fontsize=8)
-        
-        if j>0:
-            ax.set_yticklabels([],minor=False)
-        else:
-            ax.set_ylabel([r'$DKE/MKE$',r'$DKE$ ($kg\ s^{-2}$)',r'$u_g$ ($ms^{-1}$)'][i])
-        if i<=1:
-            ax.set_xticklabels([])
-        else:
-            ax.set_xticklabels(ax.get_xticks(),rotation=45)
-            ax.set_xlabel([r'$CV_{full}$',r'$CV_{lidar}$',r'$\lambda_{T_s}$ ($m$)',r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)',r'$\alpha_{T_s,u_g}$'][j])
-fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
-             ax=axs[0,4], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
-fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
-             ax=axs[1,4], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
-fig.subplots_adjust(hspace=.3,wspace=.1)
-
-plt.savefig('../../plot_output/dke1/het_type_sensitivity_big.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/het_type_sensitivity3.png', bbox_inches = "tight")
 
 # %%
 
@@ -1235,7 +1220,7 @@ fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(2, 5), cmap='coolwa
 
 ax=plt.subplot(2,1,2)
 color=plt.get_cmap('coolwarm')((nmrpt-2)/3)
-plt.scatter(ws,fnc['lst_std'][:],s=5,c=color)
+plt.scatter(ws2,fnc['lst_std'][:],s=5,c=color)
 plt.plot([0,5],[0,5],'k--',alpha=0)
 plt.grid(True,color='black',linewidth=.2,alpha=.5)
 plt.ylabel(r'$\sigma_{T_s,full}$')
@@ -1290,6 +1275,7 @@ for i in range(Nk):
             rt_10[i,:]=rt
         if netlist[j]==100:
             rt_100[i,:]=rt
+    het_[i]=fles_hets[k]
 
 
 # %% [markdown]
@@ -1298,7 +1284,7 @@ for i in range(Nk):
 # %%
 np.nanmean(rt_3,axis=1).shape
 
-# %%
+# %% jupyter={"source_hidden": true, "outputs_hidden": true}
 #plt.hist(rt_0,bins=np.linspace(0,2,20))
 site=6
 plt.hist(rt_3[site,:],bins=np.linspace(0,1.5,20),alpha=.5)
@@ -1308,38 +1294,97 @@ plt.plot([rt_0[site],rt_0[site]],[0,100])
 plt.title('')
 
 # %%
+plt.figure(figsize=(6,3))
 pos=np.array(netlist)
-plt.boxplot(netrmse.T,patch_artist=True)
-plt.title('')
-#plt.xscale('log')
-#plt.yscale('log')
+mcolor='navy'
+flierprops={'markersize':2}
+medianprops = dict(color=mcolor)
+boxprops = dict(linestyle='-', linewidth=.5)
+widths=pos[0:-1]/12#np.ones((len(pos),))
+bplot=plt.boxplot(netrmse.T*100,positions=pos[0:-1],widths=widths,patch_artist=True,medianprops=medianprops,boxprops=boxprops,flierprops=flierprops)
+for patch in bplot['boxes']:
+        patch.set_facecolor('darkgreen')
+        patch.set_alpha(.55)
+plt.plot(pos[0:-1],np.nanmedian(netrmse.T,axis=0)*100,linewidth=.5,linestyle='--',color=mcolor,alpha=.75)
+plt.xscale('log')
+plt.xlabel('Number of Sites in Virtual Network')
+plt.ylabel(r'nRMSE DKE/MKE (%)')
+plt.savefig('../../plot_output/dke1/les_network_rmse.png', bbox_inches = "tight")
 
 # %%
-plt.hist(dke_les,bins=25)
 
 # %%
-print(rt_0[11])
 
 # %%
-print(klist[11])
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # LES Figure -- Scatters
 
 # %% [markdown]
 # #### Data Prep
 
 # %%
-np.std([0,1])
+rt.shape
 
 # %% [markdown]
 # #### Plotting
 
 # %%
+fig,axs=plt.subplots(2,3,figsize=(5.5,3))
+axs=axs.flatten()
+ymin=.02
+ymax=10
+xticks=[50,100,150]
+yticks=[.1,1,10]
+yticks_l=[1,'',3,'',5]
+ylabel=r'$DKE_v/MKE_v$'
+
+# handle first axis
+ax=axs[0]
+rho=spearmanr(het_,rt_0[:],nan_policy='omit')[0]
+ax.scatter(het_,rt_0[:],color='darkgreen',s=2,alpha=.55)
+ax.set_yscale('log')
+#ax.set_yticks(yticks)
+ax.set_ylabel(ylabel,fontsize=10)
+ax.set_ylim(ymin,ymax)
+ax.set_xticks(xticks,[])
+ax.text(90,ymax*.4,r'$\rho=$'+str(rho)[0:5],fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+ax.text(10,ymax*.4,r'$N=\text{full}$',fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+
+for i in range(1,6):
+    rt=np.nanmedian([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],axis=1)
+    #lo=np.nanpercentile([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],25,axis=1)-rt
+    err=np.nanstd([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],axis=1)
+    #hi=np.nanpercentile([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],90,axis=1)-rt
+    #print(np.nanmean((err)))
+    #err=[hi*0,hi]
+    ax=axs[i]
+    rho=spearmanr(het_,rt,nan_policy='omit')[0]
+    ax.scatter(het_,rt,color='darkgreen',alpha=.55,s=err*100)
+    ax.set_yscale('log')
+    ax.set_ylim(ymin,ymax)
+    ax.tick_params(labelsize=8)
+    if i<3:
+        ax.set_xticks(xticks,[])
+    else:
+        ax.set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)',fontsize=10)
+    if i!=3:
+        pass
+        ax.set_yticks(yticks,[])
+    else:
+        #ax.set_yticks(yticks,yticks_l)
+        ax.set_ylabel(ylabel,fontsize=10)
+    ax.text(90,ymax*.4,r'$\rho=$'+str(rho)[0:5],fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+    ax.text(10,ymax*.4,r'$N=$'+str([0,3,5,7,10,100][i]),fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+plt.subplots_adjust(hspace=.1,wspace=.1)
+plt.savefig('../../plot_output/dke1/les_network_scatter.png', bbox_inches = "tight")
+
 
 # %%
+np.nanmean(err)
 
 # %%
+np.nanmean(np.nanstd(rt_100,axis=1))
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # New Correlations with New Lengthscale
@@ -1572,6 +1617,240 @@ plt.imshow(fpt['AVS_TSK'][0,:,:],cmap='coolwarm')
 
 # %%
 plt.imshow(fpu['AVV_V'][0,5,:,:],cmap='coolwarm')
+
+# %%
+print(fnc['date'][:])
+
+# %%
+plt.scatter(fnt['lst_std_site'][:],fnt['aeri_std'][:,4,2])
+plt.xlim(0,2)
+plt.ylim(0,2)
+
+# %% [markdown]
+# ### Testing Windtype, Precip, Pgrad
+#
+
+# %%
+fnc.close()
+fnc=nc.Dataset(troot+'lidar_lst_out2.nc','r')
+
+dke=fnc['DKE_z'][:]+fnc['DKE_xy'][:]
+mke=fnc['MKE_z'][:]+fnc['MKE_xy'][:]
+wfac=np.nanmean(np.sum((fnc['weighting'][:,:,:])[:,2:8,0:h],axis=2),axis=1)
+
+_mke=1/(np.nanmean(np.sum((mke)[:,2:8,0:h],axis=2),axis=1)/wfac)
+dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)/wfac
+rat=_mke*dke_1
+
+ws=np.mean(fnc['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
+ws2=np.mean(fnc['wind_speed'][:,2:8,-2],axis=(1)) #1000m
+winda=np.rad2deg(circmean(np.deg2rad(fnc['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
+lsta=fnc['lst_a'][:]
+abet=angle_diff(winda,lsta)
+windp=np.cos(abet)*ws
+repo=np.sum(fnc['sites_repo'][:,2:8,0:h,:],axis=3)
+repo=np.mean(repo,axis=(1,2))
+vort=fnc['vort'][:]
+lhet=fnc['lst_std'][:]/fnc['lst_mean'][:]*fnc['lst_lhet'][:]
+rain=np.nanmean(fnc['precip'][:,2:8],axis=1)
+rain[rain>0]=2
+rain[np.isnan(rain)]=1
+pgrad=fnc['pgrad'][:]
+
+fnc=nc.Dataset(troot+'lidar_lst_out.nc','r')
+
+# %%
+Nr=4
+Nw=20
+Nv=20
+Na=20
+Ns=2
+
+
+corr=np.zeros((3,Nr*Nw*Nv*Na*Ns))
+count=np.zeros((3,Nr*Nw*Nv*Na*Ns))
+al_=np.linspace(0,85,Na)
+vl_=np.linspace(8,35,Nv-1)
+vl_=np.append(vl_,50)
+vl_=vl_*10**(-5)
+wl_=np.linspace(5,15,Nw-2)
+wl_=np.append(wl_,[17.5,20])
+rl_=np.array([2,3,4,5])
+sl_=[0,2]
+for y in range(3):
+    dat=[rat,_mke,dke_1][y]
+    als=[]
+    vls=[]
+    wls=[]
+    rls=[]
+    sls=[]
+    i=0
+    for r in range(Nr):
+        print('.',end='',flush=True)
+        rl=rl_[r]
+        for s in range(Ns):
+            sl=sl_[s]
+            for w in range(Nw):
+                wl=wl_[w]
+                for v in range(Nv):
+                    vl=vl_[v]
+                    for a in range(Na):
+                        al=al_[a]
+                        m=(repo>=rl)
+                        m=m&(ws2<wl)
+                        m=m&(abet>al)
+                        m=m&(vort<vl)
+                        m=m&(rain<=sl)
+                        xx=lhet[m]
+                        yy=dat[m]
+                        count[y,i]=np.sum(m)
+                        corr[y,i]=spearmanr(xx,yy,nan_policy='omit')[0]
+                        als.append(al)
+                        vls.append(vl)
+                        wls.append(wl)
+                        rls.append(rl)
+                        sls.append(sl)
+    
+                        i=i+1
+
+# %%
+20*20*20*4
+
+# %%
+10*10*10*4*10*3
+
+# %%
+vs=[np.array(rls),np.array(wls),np.array(vls),np.array(als)]
+fig,axs=plt.subplots(3,5,figsize=(6,3))
+for v in range(5):
+    l_=[sl_,rl_,wl_,vl_,al_][v]
+    ls=[sls,rls,wls,vls,als][v]
+    ls=np.array(ls)
+    flip=[True,False,True,True,False][v]
+    xticks=[[0,2],[2,3,4,5],[20,15,10,5],[.0005,.0004,.0003,.0002,.0001],[0,20,40,60,80]][v]
+    xticksl=[['0.0','>0.0'],[2,3,4,5],[20,15,10,5],[r'$5e-4$','','','',r'$1e-4$'],[0,20,40,60,80]][v]
+    yticks=[.1,.2,.3,.4,.5]
+    yticksl=['0.1','','0.3','','0.5']
+    xlabel=[r'Precip. ($mm$)','MIN sites\nreporting',r'MAX $u_g$ ($ms^{-1}$)',r'MAX $|\zeta|$',r'MIN $\alpha$'][v]
+    for y in range(3):
+        ylabel=[r'$\rho_{DKE/MKE}$',r'$\rho_{1/MKE}$',r'$\rho_{DKE}$'][y]
+        ax=axs[y,v]
+        color=plt.get_cmap('nipy_spectral')(count[y,:]/273)
+        ylo=[]
+        yhi=[]
+        ym=[]
+        for j in range([Ns,Nr,Nw,Nv,Na][v]):
+            m=(ls==l_[j])&(count[y,:]>10)
+            if np.sum(m)<200:
+                ym.append(float('nan'))
+                ylo.append(float('nan'))
+                yhi.append(float('nan'))
+            else:
+                ylo.append(np.nanpercentile(corr[y,m],25))
+                yhi.append(np.nanpercentile(corr[y,m],75))
+                ym.append(np.nanpercentile(corr[y,m],50))
+        ym=np.array(ym)
+        ylo=np.array(ylo)
+        yhi=np.array(yhi)
+        ax.plot(l_,ym,'-o',markersize=2,linewidth=.75,color='darkgreen')
+        ax.fill_between(l_,ylo,yhi,alpha=.5,color='darkgreen')
+        if flip:
+            ax.invert_xaxis()
+        ax.set_ylim(.075,.6)
+        ax.grid(True,color='black',linewidth=.2)
+        if y<2:
+            ax.set_xticks(xticks,[])
+        else:
+            ax.set_xticks(xticks,xticksl,fontsize=8)
+            ax.set_xlabel(xlabel,fontsize=10)
+        if v==0:
+            ax.set_ylabel(ylabel)
+            ax.set_yticks(yticks,yticksl,fontsize=8)
+        else:
+            ax.set_yticks(yticks,[])
+        #ax.scatter(vs[v],corr[y,:],s=5,color=color)
+plt.savefig('../../plot_output/dke1/filter_sensitivity_precip.png', bbox_inches = "tight")
+
+# %%
+(10**4)**(1/3)
+
+# %% [markdown]
+# ### More Scratch
+
+# %%
+fnt['aeri_std'][:].shape
+
+# %%
+fnc['height'][0:10]
+
+# %%
+h=16
+dke=fnt['DKE_z'][:]+fnt['DKE_xy'][:]
+mke=fnt['MKE_z'][:]+fnt['MKE_xy'][:]
+
+wfac=np.nanmean(np.sum((fnt['weighting'][:,:,:])[:,2:8,0:h],axis=2),axis=1)
+
+_mke=1/(np.nanmean(np.sum((mke)[:,2:8,0:h],axis=2),axis=1)/wfac)
+dke_1=np.nanmean(np.sum((dke/1)[:,2:8,0:h],axis=2),axis=1)/wfac
+rat=_mke*dke_1
+
+ws=np.mean(fnt['wind_speed'][:,2:8,0:5],axis=(1,2)) #first 200m
+winda=np.rad2deg(circmean(np.deg2rad(fnt['wind_a'][:,2:8,0:5]),axis=(1,2),nan_policy='omit'))
+lsta=fnt['lst_a'][:]
+abet=angle_diff(winda,lsta)
+windp=np.cos(abet)*ws
+repo=np.sum(fnt['sites_repo'][:,2:8,0:h,:],axis=3)
+repo=np.mean(repo,axis=(1,2))
+vort=fnt['vort'][:]
+lhet=fnt['lst_lhet'][:]
+cv=fnt['lst_std'][:]/fnt['lst_mean'][:]
+cv_s=fnt['lst_std_site'][:]/fnt['lst_mean'][:]
+astd=np.nanmean(fnt['aeri_std'][:,4,0:4],axis=1)
+cv_a=astd/fnt['lst_mean'][:]
+het=lhet*cv
+m=(ws<15)&(abet>20)&(repo>=3)&(vort<4*10**(-4))&(astd<2)
+
+color=plt.get_cmap('Spectral')(ws/15)
+
+corr=np.zeros((2,5))
+#corr2=np.zeros((2,4))
+xx=np.ones((2,5,70))*float('nan')
+yy=np.ones((2,5,70))*float('nan')
+
+for v in range(2):
+    for j in range(5):
+        xx[v,j,m]=[cv,cv_s,cv_a,lhet,het][j][m]
+        yy[v,j,m]=[rat,dke_1][v][m]
+        corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
+
+# %%
+fig,axs=plt.subplots(2,5,figsize=(6,3),width_ratios=[1,1,1,1,1.25])
+for i in range(2):
+    for j in range(5):
+        ax=axs[i,j]
+        ax.scatter(xx[i,j],yy[i,j],s=3,c=color)
+
+        # logscale
+        ax.semilogy()
+        ax.grid(True,color='black',linewidth=.2)
+        ax.set_title(r'$\rho_s=$'+str(np.round(corr[i,j],3)))
+        
+        if j>0:
+            ax.set_yticklabels([],minor=False)
+        else:
+            ax.set_ylabel([r'$DKE/MKE$',r'$DKE$ ($kg\ s^{-2}$)'][i])
+        if i==0:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xticklabels(ax.get_xticks(),rotation=45)
+            ax.set_xlabel([r'$CV_{full}$',r'$CV_{site}$',r'$CV_{aeri}$',r'$\lambda_{T_s}$ ($m$)',r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)'][j])
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
+             ax=axs[0,4], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
+             ax=axs[1,4], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.subplots_adjust(hspace=.3,wspace=.1)
+
+plt.savefig('../../plot_output/dke1/het_type_sensitivity_aeri.png', bbox_inches = "tight")
 
 # %%
 

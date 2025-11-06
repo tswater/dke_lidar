@@ -511,8 +511,22 @@ plt.semilogy()
 # %%
 fp=rasterio.open(troot+'GOES_holes/OR_ABI-L2-LSTC-M3_G16_s20172140422189_e20172140424561_c20172140426101.tif','r')
 
+
 # %%
-fp.index(-97.9,36.3)
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+    if (np.sum(np.isnan(v1))+np.sum(np.isnan(v2)))>0:
+        return float('nan')
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))*180/np.pi
+
+
+# %%
+fp.xy(0,0)
 
 # %%
 data=fp.read(1)
@@ -521,14 +535,62 @@ data=fp.read(1)
 plt.imshow(data,cmap='coolwarm')
 
 # %%
+
+# %%
+plt.imshow(data[0:20])
+print(np.nanmean(np.nanstd(data[0:20,:],axis=1)))
+print(np.nanmean(np.nanstd(data[0:20,:],axis=0)))
+
+
+# %%
+grad=np.gradient(lst_mesoscale)
+xgrad.append(np.nanmean(grad[0]))
+ygrad.append(np.nanmean(grad[1]))
+
+# %%
 from scipy.ndimage import rotate
 
 # %%
+
+#data[:,30:]=data[:,30:]+4
+
 data[np.isnan(data)]=np.nanmean(data)
-out=rotate(data,45,cval=float('nan'))
+data=data[:,0:20]
+grad=np.gradient(data)
+xgrad=(np.nanmean(grad[0]))
+ygrad=(np.nanmean(grad[1]))
+print(xgrad)
+print(ygrad)
+print(angle_between([xgrad,ygrad],[1,0]))
+#out=rotate(data,90,cval=float('nan'))
+#out[0:20,:]=np.nanmean(out)
+#out[20:,:]=np.nanmean(out-1)
 
 # %%
-plt.imshow(out,cmap='coolwarm')
+np.sin(0)
+
+# %%
+plt.imshow(data,cmap='coolwarm')
+plt.plot([0,0],[0,-1])
+
+# %%
+plt.imshow(out[:,:],cmap='coolwarm')
+
+# %%
+stds_0=np.nanstd(out,axis=1)
+cnts_0=np.nansum(~np.isnan(out),axis=1)
+stds_0=stds_0*cnts_0/np.nansum(cnts_0)
+std_perp=np.nansum(stds_0)
+print(std_perp)
+
+stds_0=np.nanstd(out,axis=0)
+cnts_0=np.nansum(~np.isnan(out),axis=0)
+stds_0=stds_0*cnts_0/np.nansum(cnts_0)
+std_perp=np.nansum(stds_0)
+print(std_perp)
+
+# %%
+plt.imshow(data,cmap='coolwarm')
 
 # %%
 out[25,25]

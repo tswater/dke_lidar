@@ -351,7 +351,7 @@ plt.savefig('../../plot_output/dke1/les_prof_cmb2.png', bbox_inches = "tight")
 
 # %%
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # LIDAR Example Profiles + Surface
 
 # %%
@@ -514,7 +514,8 @@ for i in range(3):
     for k in range(5):
         s=list(colors.keys())[k]
         ax[i].plot(profs[i][s],z,'-o',color=colors[s],markersize=2,linewidth=.5,label=s)
-    ax1[i].plot(dkep[i][0:35],z[0:35],'-',color='black')
+    ax1[i].plot(dkep[i][0:35],z[0:35],'-o',color='black',markersize=2)
+    ax1[i].set_xlim(-.02,1.35)
     if i==2:
         l=ax[i].legend(fontsize=7,loc='lower right',framealpha=.95)
         #l.set_labelsize(8)
@@ -572,7 +573,7 @@ plt.savefig('../../plot_output/dke1/lidar_prof_sfc_dke2.png', bbox_inches = "tig
 
 # %%
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # LIDAR DKE through Time
 
 # %% [markdown]
@@ -1299,12 +1300,12 @@ fnc.close()
 # #### Plotting
 
 # %%
-plt.figure(figsize=(2.75,5))
+fig=plt.figure(figsize=(2.75,5))
 ax=plt.subplot(2,1,1)
 nmrpt=np.nanmean(np.nansum(fnc['sites_repo'][:],axis=3),axis=(1,2))
 color=plt.get_cmap('coolwarm')((nmrpt-2)/3)
-plt.scatter(fnc['lst_std'][:],fnc['lst_std_site'][:],s=5,c=color)
-plt.plot([0,5],[0,5],'k--',alpha=.5)
+plt.scatter(fnc['lst_std'][:],fnc['lst_std_site'][:],s=1,alpha=.4,c=color)
+plt.plot([0,5],[0,5],'k--',alpha=.5,linewidth=.5)
 plt.grid(True,color='black',linewidth=.2,alpha=.5)
 plt.xlabel(r'$\sigma_{T_s,full}$')
 plt.ylabel(r'$\sigma_{T_s,lidars}$')
@@ -1315,7 +1316,7 @@ fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(2, 5), cmap='coolwa
 
 ax=plt.subplot(2,1,2)
 color=plt.get_cmap('coolwarm')((nmrpt-2)/3)
-plt.scatter(ws2,fnc['lst_std'][:],s=5,c=color)
+plt.scatter(ws2,fnc['lst_std'][:],s=1,alpha=.5,c=color)
 plt.plot([0,5],[0,5],'k--',alpha=0)
 plt.grid(True,color='black',linewidth=.2,alpha=.5)
 plt.ylabel(r'$\sigma_{T_s,full}$')

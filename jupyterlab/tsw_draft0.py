@@ -61,7 +61,7 @@ fnc['weighting'][5,5,5]
 
 # %%
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # LES Example Profiles + DKE
 
 # %% [markdown]

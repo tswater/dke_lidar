@@ -4,7 +4,8 @@ import netCDF4 as nc
 import os
 
 lesdir ='/home/tsw35/xSot_shared/LES_3D/clasp/fr2/'
-outfile='/home/tsw35/soteria/dke_lidar/pickle_tsw/dke_mke_tsw.pkl'
+lesdirt='/home/tsw35/xSot_shared/LES_3D/clasp/trim/'
+outfile='/home/tsw35/soteria/dke_lidar/pickle_tsw/dke_mke_tke_tsw.pkl'
 netfile='/home/tsw35/soteria/dke_lidar/pickle_tsw/nets.pkl'
 
 daylist=[]
@@ -42,10 +43,11 @@ for day in daylist:
     print('Asessing '+day,flush=True)
     out[day[4:12]]={}
     for j in range(len(netlist)):
-        out[day[4:12]][netlist[j]]={'dke':float('nan'),'mke':float('nan'),\
+        out[day[4:12]][netlist[j]]={'dke':float('nan'),'mke':float('nan'),'tke':float('nan'),\
                                     'dkes':np.zeros((100,)),'mkes':np.zeros((100,))}
     dke_=np.zeros((6,226))
     mke_=np.zeros((6,226))
+    tke_=np.zeros((6,226))
     weight_=np.zeros((6,226))
     idx_=np.zeros((6,))
     yr=day[4:8]
@@ -53,6 +55,7 @@ for day in daylist:
     dy=day[10:12]
 
     i=0
+    fp_tke=nc.Dataset(lesdirt+'trim'+day+'.nc','r')
     for hour in [15,16,17,18,19,20]:
         print('   '+str(hour)+':',end='',flush=True)
         fp=nc.Dataset(lesdir+day+'/diag_d01_'+yr+'-'+mn+'-'+dy+'_'+str(hour)+':00:00','r')
@@ -62,6 +65,13 @@ for day in daylist:
         z=fp['AVP_Z'][0,:]
         rho=fp['AVP_RHO'][0,:]
         dke_[i,:],mke_[i,:],weight_[i,:],idx_[i]=get_les_dke(u,v,w,z,rho)
+        
+        # Now get TKE from other file
+        idx_tke=int(18+(hour-15)*6)
+        w2tke=fp_tke['w2'][idx_tke,:]
+        w2fix=(w2tke[0:-1]+w2tke[1:])/2
+        tke_[i,:]=0.5*(fp_tke['u2'][idx_tke,:]+fp_tke['v2'][idx_tke,:]+w2fix)
+        
         print('*',end='',flush=True)
         for j in range(len(netlist)):
             nsz=netlist[j]
@@ -94,15 +104,19 @@ for day in daylist:
         fp.close()
         i=i+1
         print()
+    fp_tke.close()
     dke_=(weight_*dke_)
     mke_=(weight_*mke_)
+    tke_=(weight_*tke_)
     dke=[]
     mke=[]
+    tke=[]
     idx=int(np.nanmean(idx_))
     for i in range(6):
         dke.append(np.sum(dke_[i,0:idx])/np.sum(weight_[i,0:idx]))
         mke.append(np.sum(mke_[i,0:idx])/np.sum(weight_[i,0:idx]))
-    out[day[4:12]][0]={'dke':np.nanmean(dke),'mke':np.nanmean(mke)}
+        tke.append(np.sum(tke_[i,0:idx])/np.sum(weight_[i,0:idx]))
+    out[day[4:12]][0]={'dke':np.nanmean(dke),'mke':np.nanmean(mke),'tke':np.nanmean(tke)}
 
 pickle.dump(out,open(outfile,'wb'))
 

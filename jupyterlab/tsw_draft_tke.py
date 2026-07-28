@@ -54,12 +54,23 @@ lonlat={'E37':[-97.927376, 36.3109],
         'C1':[-97.48658, 36.605293]}
 
 # %%
-len('diag_d01_2016-06-26_02')
+fles.keys()
 
 # %%
-fnc['weighting'][5,5,5]
+tot={}
+for d in fnc['date'][:]:
+    for d2 in fles.keys():
+        if int(d)==int(d2):
+            tot[d]=0
+            for file in os.listdir(troot+'aeri_temp'):
+                if str(d) in file:
+                    tot[d]=tot[d]+1
 
 # %%
+for k in tot.keys():
+    if tot[k]>=3:
+        print(k)
+
 
 # %% [markdown]
 # # LES Example Profiles + DKE
@@ -68,15 +79,10 @@ fnc['weighting'][5,5,5]
 # #### Data Prep
 
 # %%
-fp=nc.Dataset(bdir+'fr2_'+day+'_00/diag_d01_2016-06-25_130000','r')
 
 # %%
 
 # %%
-fp['AVV_Z'][:].shape
-a=np.nanmean(fp['AVV_Z'][:],axis=(0,2,3))
-np.where(a<1000)
-
 
 # %%
 def get_les_dke(fp):
@@ -124,11 +130,45 @@ for file in daylist:
     fpt=nc.Dataset(wdir+htdir+file[0:22]+'_wind.nc','r')
     dke,mke=get_les_dke(fpg)
     hmg_td[i-1,:]=dke[:100]
-    hmg_tdm[i-1,:]=dke[:100]/mke[:100]
+    hmg_tdm[i-1,:]=dke[:100]/(mke[:100]+dke[:100])
     dke,mke=get_les_dke(fpt)
     het_td[i-1,:]=dke[:100]
-    het_tdm[i-1,:]=dke[:100]/mke[:100]
+    het_tdm[i-1,:]=dke[:100]/(mke[:100]+dke[:100])
     i=i+1
+
+# %%
+
+# %%
+data=np.zeros((520,520))
+fp=fpt
+u=fp['AVV_U'][0,10,:,:]
+v=fp['AVV_V'][0,10,:,:]
+w=fp['AVV_W'][0,10,:,:]
+for i in range(520):
+    i_0=min(min(i,i-4),520-9)
+    i_f=max(max(i,i+4),9)
+    for j in range(520):
+        j_0=min(min(j,j-4),520-9)
+        j_f=max(max(j,j+4),9)
+        data[i,j]=0.5*(np.nanvar(u[i_0:i_f,j_0:j_f])+np.nanvar(v[i_0:i_f,j_0:j_f])+np.nanvar(w[i_0:i_f,j_0:j_f]))
+
+# %%
+np.nanmean(data)
+
+# %%
+len(dke)
+
+# %%
+dke[10]
+
+# %%
+plt.plot(fptket['tke'][:])
+w2t=(fptket['w2'][:,:-1]+fptket['w2'][:,1:])/2
+tket=(fptket['u2'][:,:]+fptket['v2'][:,:]+w2t)*0.5
+tkett=np.sum(tket,axis=1)
+plt.plot(tkett*28)
+time2=np.linspace(6,90,15)
+plt.plot(time2,dke_sum*28)
 
 # %%
 import scipy
@@ -193,8 +233,8 @@ if version=='dke':
     hmg_d=hmg_td
 elif version=='dke_mke':
     dmin=0
-    dmax=.25
-    dlabel=r'$DKE/MKE$'
+    dmax=.2
+    dlabel=r'$\frac{DKE}{DKE+MKE}$'
     het_d=het_tdm
     hmg_d=hmg_tdm
     
@@ -258,7 +298,7 @@ cb=fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(-4, 4), cmap=cma
 cb.ax.tick_params(labelsize=fnts)
 cb.set_label(label=r'$u$ ($ms^{-1}$)',size=fntn)
 
-plt.savefig('../../plot_output/dke1/les_prof_'+version+'.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/tke_versions/les_prof_'+version+'.png', bbox_inches = "tight")
 
 # %%
 fig,axs=plt.subplots(3,2,figsize=(5,5),width_ratios=[1,1.25])
@@ -279,8 +319,8 @@ for i in range(2):
         hmg_d=hmg_td
     elif version=='dke_mke':
         dmin=0
-        dmax=.25
-        dlabel=r'$DKE/MKE$'
+        dmax=.2
+        dlabel=r'$\frac{DKE}{DKE+MKE}$'
         het_d=het_tdm
         hmg_d=hmg_tdm
         
@@ -347,7 +387,7 @@ cb=fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(-4, 4), cmap=cma
 cb.ax.tick_params(labelsize=fnts)
 cb.set_label(label=r'$u$ ($ms^{-1}$)',size=fntn)
 
-plt.savefig('../../plot_output/dke1/les_prof_cmb2.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/tke_versions/les_prof_cmb2.png', bbox_inches = "tight")
 
 # %%
 
@@ -357,7 +397,6 @@ plt.savefig('../../plot_output/dke1/les_prof_cmb2.png', bbox_inches = "tight")
 # %%
 
 # %%
-fnc['date'][:].data
 
 # %%
 
@@ -497,8 +536,11 @@ grid[0].text(-17,-4,'b)',fontsize=8)
 plt.savefig('../../plot_output/dke1/lidar_prof_sfc.png', bbox_inches = "tight")
 
 # %%
+goes[i].shape
+
+# %%
 fig=plt.figure(figsize=(5.5,7))
-subfigs = fig.subfigures(3, 1, hspace=0,wspace=0,frameon=False,height_ratios=[1.25,1.25,1.1])
+subfigs = fig.subfigures(3, 1, hspace=0,wspace=0,frameon=False,height_ratios=[1.25,1.25,1.2])
 ax1=subfigs[1].subplots(1,3)
 ax=subfigs[0].subplots(1,3)
 grid=ImageGrid(subfigs[2], 111,  # similar to subplot(111)
@@ -506,7 +548,7 @@ grid=ImageGrid(subfigs[2], 111,  # similar to subplot(111)
                 axes_pad=0.1,
                 cbar_mode='each',
                 cbar_location='bottom',
-                cbar_pad=.02,
+                cbar_pad=.2,
                 cbar_size="5%")
 vmax=np.nanpercentile(goes,95)
 vmin=296
@@ -552,8 +594,10 @@ for i in range(3):
     print(np.rad2deg(wdir[i]))
     grid[i].arrow(20, 20, mag*np.sin(wdir[i]), -mag*np.cos(wdir[i]), linewidth=2, head_width=0.2, head_length=0.1,color='black',alpha=.6)
 
-    grid[i].set_xticks([])
-    grid[i].set_yticks([])
+    grid[i].set_xticks([0,10,20,30,40],['',20,40,60,80])
+    grid[i].set_yticks([0,10,20,30,40],['',20,40,60,80])
+    grid[i].set_ylabel(r'Distance ($km$)',fontsize=8)
+    grid[i].tick_params(axis='both',which='major',labelsize=6)
 
     ax[i].set_title(days[i][0:4]+'-'+days[i][4:6]+'-'+days[i][6:8],fontsize=10)
 
@@ -570,7 +614,7 @@ ax[0].text(-.3,1075,'a)',fontsize=8)
 ax1[0].text(-.42,1075,'b)',fontsize=8)
 grid[0].text(-17,-4,'c)',fontsize=8)
 
-plt.savefig('../../plot_output/dke1/lidar_prof_sfc_dke2.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/lidar_prof_sfc_dke3.png', bbox_inches = "tight")
 
 # %%
 
@@ -616,12 +660,15 @@ mxyhi=np.array(mxyhi)
 mzlo=np.array(mzlo)
 mzhi=np.array(mzhi)
 
+# %%
+len(mzlo)+len(mzhi)
+
 # %% [markdown]
 # #### Plotting
 
 # %%
 ##### SETUP
-version=['dke','dke_mke'][1]
+version=['dke','dke_mke'][0]
 cmap='nipy_spectral'
 mn=2
 mx=98
@@ -731,17 +778,24 @@ gxy[1].text(-.5,37,'b)',fontsize=8)
 gz[0].text(-.5,37,'c)',fontsize=8)
 gz[1].text(-.5,37,'d)',fontsize=8)
 
-plt.savefig('../../plot_output/dke1/lidar_prof_time_ratio.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/tke_versions/lidar_prof_time.png', bbox_inches = "tight")
 
 # %%
 ##### SETUP
-version=['dke','dke_mke'][1]
+version=['dke','dke_mke','both'][2]
 cmap='nipy_spectral'
 mn=2
 mx=98
-fig=plt.figure(figsize=(5.5,2))
-subfigs = fig.subfigures(1, 1, hspace=0,wspace=0,frameon=False,height_ratios=[1])
-gxy=ImageGrid(subfigs, 111,  # similar to subplot(111)
+fig=plt.figure(figsize=(5.5,3.5))
+subfigs = fig.subfigures(2, 1, hspace=0,wspace=0,frameon=False,height_ratios=[1,1])
+gxy=ImageGrid(subfigs[0], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=0.1,
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+gz=ImageGrid(subfigs[1], 111,  # similar to subplot(111)
                 nrows_ncols=(1, 2),
                 axes_pad=0.1,
                 cbar_mode='single',
@@ -761,12 +815,24 @@ if version=='dke':
     clabelxy=r'$DKE_{xy}$ ($m^{2}\ s^{-2}$)'
     clabelz=r'$DKE_{z}$ ($m^{2}\ s^{-2}$)'
 elif version=='dke_mke':
-    d_xyl=np.nanmedian((dxylo+dzlo)/(mxylo+mzlo),axis=0)
-    d_xyh=np.nanmedian((dxyhi+dzhi)/(mxyhi+mzhi),axis=0)
-    clabelxy=r'$DKE/MKE$'
+    d_xyl=np.nanmedian(dxylo/mxylo,axis=0)
+    d_xyh=np.nanmedian(dxyhi/mxyhi,axis=0)
+    d_zl=np.nanmedian(dzlo/mzlo,axis=0)
+    d_zh=np.nanmedian(dzhi/mzhi,axis=0)
+    clabelxy=r'$DKE_{xy}/MKE_{xy}$'
+    clabelz=r'$DKE_{z}/MKE_{z}$'
+elif version=='both':
+    d_xyl=np.nanmean((dxylo+dzlo),axis=0)
+    d_xyh=np.nanmean((dxyhi+dzhi),axis=0)
+    d_zl=np.nanmedian((dxylo+dzlo)/(mzlo+mxylo),axis=0)
+    d_zh=np.nanmedian((dxyhi+dzhi)/(mzhi+mxyhi),axis=0)
+    clabelxy=r'$DKE$'
+    clabelz=r'$\frac{DKE}{DKE+MKE}$'
 
 vmn_xy=min(np.nanpercentile(d_xyl,mn),np.nanpercentile(d_xyh,mn))
 vmx_xy=max(np.nanpercentile(d_xyl,mx),np.nanpercentile(d_xyh,mx))
+vmn_z=min(np.nanpercentile(d_zl,mn),np.nanpercentile(d_zh,mn))
+vmx_z=max(np.nanpercentile(d_zl,mx),np.nanpercentile(d_zh,mx))
 
 xticks=np.linspace(0,len(time)-1,len(time))
 xticks_l=['8:00','','10:00','','12:00','','14:00','','16:00','','18:00']
@@ -782,8 +848,8 @@ im=gxy[1].imshow(d_xyh.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_xy,
 #gxy[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
 #gxy[1].set_yticks([4.2,11.8,19.6,27.25])
 
-gxy[0].set_xticks(xticks,xticks_l,rotation=45)
-gxy[1].set_xticks(xticks,xticks_l,rotation=45)
+gxy[0].set_xticks(xticks,[])
+gxy[1].set_xticks(xticks,[])
 gxy[0].set_yticks(yticks,yticks_l)
 gxy[1].set_yticks(yticks,yticks_l)
 
@@ -795,19 +861,506 @@ gxy[1].tick_params(labelsize=8)
 gxy[0].set_ylabel(r'Height $(m)$',fontsize=8)
 gxy[0].grid(True,alpha=1,color='black',linewidth=.1)
 gxy[1].grid(True,alpha=1,color='black',linewidth=.1)
-gxy[0].set_xlabel('Local Hour',fontsize=8)
-gxy[1].set_xlabel('Local Hour',fontsize=8)
 
 cb=gxy.cbar_axes[0].colorbar(im)
 gxy.cbar_axes[0].tick_params(labelsize=8)
 cb.set_label(label=clabelxy,size=8)
 
 
+##### Plotting Bottom
+gz[0].imshow(d_zl.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_z,vmax=vmx_z,interpolation='spline16')
+im=gz[1].imshow(d_zh.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_z,vmax=vmx_z,interpolation='spline16')
+
+#gz[1].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
+#gz[1].set_yticks([4.2,11.8,19.6,27.25])
+
+gz[0].set_xticks(xticks,xticks_l,rotation=45)
+gz[1].set_xticks(xticks,xticks_l,rotation=45)
+gz[0].set_yticks(yticks,yticks_l)
+gz[1].set_yticks(yticks,yticks_l)
+
+gz[0].tick_params(labelsize=8)
+gz[1].tick_params(labelsize=8)
+gz[0].set_ylabel(r'Height $(m)$',fontsize=8)
+gz[0].set_xlabel('Local Hour',fontsize=8)
+gz[1].set_xlabel('Local Hour',fontsize=8)
+gz[0].grid(True,alpha=1,color='black',linewidth=.1)
+gz[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+cb=gz.cbar_axes[0].colorbar(im)
+gz.cbar_axes[0].tick_params(labelsize=8)
+cb.set_label(label=clabelz,size=8)
+
 #### Add Figure Labeling
 gxy[0].text(-.5,37,'a)',fontsize=8)
 gxy[1].text(-.5,37,'b)',fontsize=8)
+gz[0].text(-.5,37,'c)',fontsize=8)
+gz[1].text(-.5,37,'d)',fontsize=8)
 
-plt.savefig('../../plot_output/dke1/lidar_prof_time_ratio_full.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/tke_versions/lidar_prof_time_both.png', bbox_inches = "tight")
+
+# %%
+##### SETUP
+cmap='nipy_spectral'
+mn=2
+mx=98
+fig=plt.figure(figsize=(5.5,5))
+subfigs = fig.subfigures(3, 1, hspace=0,wspace=0,frameon=False,height_ratios=[1,1,1])
+g1=ImageGrid(subfigs[0], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+g2=ImageGrid(subfigs[1], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+g3=ImageGrid(subfigs[2], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+
+height=fnc['height'][:]
+time=fnc['hour'][:].astype(int)
+
+##### Final Data Prep
+d_1l=np.nanmean((dxylo+dzlo),axis=0)
+d_1h=np.nanmean((dxyhi+dzhi),axis=0)
+d_3l=np.nanmedian((dxylo+dzlo)/(mzlo+mxylo),axis=0)
+d_3h=np.nanmedian((dxyhi+dzhi)/(mzhi+mxyhi),axis=0)
+d_2l=np.nanmean(dzlo,axis=0)
+d_2h=np.nanmean(dzhi,axis=0)
+clabel1=r'$DKE$'
+clabel2=r'$DKE_{z}$'
+clabel3=r'$\frac{DKE}{DKE+MKE}$'
+
+vmn_1=min(np.nanpercentile(d_1l,mn),np.nanpercentile(d_1h,mn))
+vmx_1=max(np.nanpercentile(d_1l,mx),np.nanpercentile(d_1h,mx))
+vmn_2=min(np.nanpercentile(d_2l,mn),np.nanpercentile(d_2h,mn))
+vmx_2=max(np.nanpercentile(d_2l,mx),np.nanpercentile(d_2h,mx))
+vmn_3=min(np.nanpercentile(d_3l,mn),np.nanpercentile(d_3h,mn))
+vmx_3=max(np.nanpercentile(d_3l,mx),np.nanpercentile(d_3h,mx))
+
+xticks=np.linspace(0,len(time)-1,len(time))
+xticks_l=['8:00','','10:00','','12:00','','14:00','','16:00','','18:00']
+yticks=[0.4,4.2,8,11.8,15.6,19.6,23.4,27.25,31]
+yticks_l=['','200','','400','','600','','800','']
+
+##### Plotting Top
+g1[0].imshow(d_1l.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_1,vmax=vmx_1,interpolation='spline16')
+im=g1[1].imshow(d_1h.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_1,vmax=vmx_1,interpolation='spline16')
+
+#gxy[1].set_xticks([0,3,6,9],[])
+#gxy[0].set_xticks([0,3,6,9],[])
+#gxy[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
+#gxy[1].set_yticks([4.2,11.8,19.6,27.25])
+
+g1[0].set_xticks(xticks,[])
+g1[1].set_xticks(xticks,[])
+g1[0].set_yticks(yticks,yticks_l)
+g1[1].set_yticks(yticks,yticks_l)
+
+
+g1[0].set_title('Less Heterogeneous',fontsize=10)
+g1[1].set_title('Very Heterogeneous',fontsize=10)
+g1[0].tick_params(labelsize=8)
+g1[1].tick_params(labelsize=8)
+g1[0].set_ylabel(r'Height $(m)$',fontsize=8)
+g1[0].grid(True,alpha=1,color='black',linewidth=.1)
+g1[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+cb=g1.cbar_axes[0].colorbar(im)
+g1.cbar_axes[0].tick_params(labelsize=8)
+cb.set_label(label=clabel1,size=8)
+
+
+##### Plotting Middle
+g2[0].imshow(d_2l.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_2,vmax=vmx_2,interpolation='spline16')
+im=g2[1].imshow(d_2h.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_2,vmax=vmx_2,interpolation='spline16')
+
+#gz[1].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
+#gz[1].set_yticks([4.2,11.8,19.6,27.25])
+
+g2[0].set_xticks(xticks,[])
+g2[1].set_xticks(xticks,[])
+g2[0].set_yticks(yticks,yticks_l)
+g2[1].set_yticks(yticks,yticks_l)
+
+g2[0].tick_params(labelsize=8)
+g2[1].tick_params(labelsize=8)
+g2[0].set_ylabel(r'Height $(m)$',fontsize=8)
+#g2[0].set_xlabel('Local Hour',fontsize=8)
+#g2[1].set_xlabel('Local Hour',fontsize=8)
+g2[0].grid(True,alpha=1,color='black',linewidth=.1)
+g2[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+cb=g2.cbar_axes[0].colorbar(im)
+g2.cbar_axes[0].tick_params(labelsize=8)
+cb.set_label(label=clabel2,size=8)
+
+
+##### Plotting Bottom
+g3[0].imshow(d_3l.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_3,vmax=vmx_3,interpolation='spline16')
+im=g3[1].imshow(d_3h.T[0:-1,:],cmap=cmap,origin='lower',aspect=.2,vmin=vmn_3,vmax=vmx_3,interpolation='spline16')
+
+#gz[1].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
+#gz[1].set_yticks([4.2,11.8,19.6,27.25])
+
+g3[0].set_xticks(xticks,xticks_l,rotation=45)
+g3[1].set_xticks(xticks,xticks_l,rotation=45)
+g3[0].set_yticks(yticks,yticks_l)
+g3[1].set_yticks(yticks,yticks_l)
+
+g3[0].tick_params(labelsize=8)
+g3[1].tick_params(labelsize=8)
+g3[0].set_ylabel(r'Height $(m)$',fontsize=8)
+g3[0].set_xlabel('Local Hour',fontsize=8)
+g3[1].set_xlabel('Local Hour',fontsize=8)
+g3[0].grid(True,alpha=1,color='black',linewidth=.1)
+g3[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+cb=g3.cbar_axes[0].colorbar(im)
+g3.cbar_axes[0].tick_params(labelsize=8)
+cb.set_label(label=clabel3,size=8)
+
+
+#### Add Figure Labeling
+g1[0].text(-.5,37,'a)',fontsize=8)
+g1[1].text(-.5,37,'b)',fontsize=8)
+g2[0].text(-.5,37,'c)',fontsize=8)
+g2[1].text(-.5,37,'d)',fontsize=8)
+g3[0].text(-.5,37,'e)',fontsize=8)
+g3[1].text(-.5,37,'f)',fontsize=8)
+
+plt.savefig('../../plot_output/dke1/tke_versions/lidar_prof_time_cmb.png', bbox_inches = "tight")
+
+# %%
+np.nanpercentile(d_3h,98)
+
+
+# %%
+
+# %% [markdown]
+# # LiDAR and LES Combined 
+
+# %% [markdown]
+# ####  Data Prep Fucntions
+
+# %%
+def get_lidar_data():
+    dxylo=[]
+    dxyhi=[]
+    dzlo=[]
+    dzhi=[]
+    
+    mxylo=[]
+    mxyhi=[]
+    mzlo=[]
+    mzhi=[]
+    
+    for i in range(len(fnc['date'][:])):
+        std=fnc['lst_std'][i]
+        if std >=.75:
+            dxyhi.append(fnc['DKE_xy'][i,:,:]/fnc['weighting'][i,:,:])
+            dzhi.append(fnc['DKE_z'][i,:,:]/fnc['weighting'][i,:,:])
+            mxyhi.append(fnc['MKE_xy'][i,:,:]/fnc['weighting'][i,:,:])
+            mzhi.append(fnc['MKE_z'][i,:,:]/fnc['weighting'][i,:,:])
+        else:
+            dxylo.append(fnc['DKE_xy'][i,:,:]/fnc['weighting'][i,:,:])
+            dzlo.append(fnc['DKE_z'][i,:,:]/fnc['weighting'][i,:,:])
+            mxylo.append(fnc['MKE_xy'][i,:,:]/fnc['weighting'][i,:,:])
+            mzlo.append(fnc['MKE_z'][i,:,:]/fnc['weighting'][i,:,:])
+    
+    dxylo=np.array(dxylo)
+    dxyhi=np.array(dxyhi)
+    dzlo=np.array(dzlo)
+    dzhi=np.array(dzhi)
+    
+    mxylo=np.array(mxylo)
+    mxyhi=np.array(mxyhi)
+    mzlo=np.array(mzlo)
+    mzhi=np.array(mzhi)
+
+    return dxylo+dzlo,(dxylo+dzlo)/(mzlo+mxylo),dxyhi+dzhi,(dxyhi+dzhi)/(mzhi+mxyhi)
+
+
+# %%
+np.interp(np.array([100,200,300,400,500,600,700,800,900,1000]),fnc['height'][:],np.linspace(0,35,36))
+
+# %%
+d_1l.shape
+
+# %%
+cmap='nipy_spectral'
+mn=2
+mx=98
+aspct=1.4
+fig=plt.figure(figsize=(6.5,4))
+subfigs = fig.subfigures(3, 2, hspace=0,wspace=0,frameon=False,height_ratios=[1,1,1])
+g1l=ImageGrid(subfigs[0,0], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+g2l=ImageGrid(subfigs[1,0], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+
+g3=ImageGrid(subfigs[2,0], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+
+g1d=ImageGrid(subfigs[0,1], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+g2d=ImageGrid(subfigs[1,1], 111,  # similar to subplot(111)
+                nrows_ncols=(1, 2),
+                axes_pad=(0.1,.02),
+                cbar_mode='single',
+                cbar_location='right',
+                cbar_pad=.04,
+                cbar_size="5%")
+
+#### Data Prep
+d_1l,d_3l,d_1h,d_3h=get_lidar_data()
+d_1l=np.nanmean(d_1l,axis=0)
+d_1h=np.nanmean(d_1h,axis=0)
+d_3l=np.nanmedian(d_3l,axis=0)
+d_3h=np.nanmedian(d_3h,axis=0)
+clabel1=r'$DKE$'
+clabel3=r'$\frac{DKE}{DKE+MKE}$'
+
+import scipy
+
+hr=19
+hr_='diag_d01_2016-06-25_'+str(hr)+'0000'
+hr2='diag_d01_2016-06-25_'+str(hr)+'_wind.nc'
+
+fpu=nc.Dataset(wdir+htdir+hr2,'r')
+fpt=nc.Dataset(bdir+htdir+hr_,'r')
+het_su[10:,:]=fpu['AVV_V'][0,0:100,:,350]
+het_tsf[0,:]=fpt['AVS_TSK'][0,:,350]
+het_norm=np.nanmean(fpu['AVV_V'][0,0:40,:,:])
+
+fpu=nc.Dataset(wdir+hgdir+hr2,'r')
+fpt=nc.Dataset(bdir+hgdir+hr_,'r')
+hmg_su[10:,:]=fpu['AVV_V'][0,0:100,:,350]
+hmg_tsf[0,:]=fpt['AVS_TSK'][0,:,350]
+hmg_norm=np.nanmean(fpu['AVV_V'][0,0:40,:,:])
+
+for i in range(10):
+    het_tsf[i,:]=het_tsf[0,:]
+    hmg_tsf[i,:]=hmg_tsf[0,:]
+
+hmg_su[10:]=scipy.ndimage.gaussian_filter(hmg_su[10:], sigma=2, mode='reflect') # smoother
+het_su[10:]=scipy.ndimage.gaussian_filter(het_su[10:], sigma=2, mode='reflect')
+hmg_su[:]=hmg_su[:]-hmg_norm
+het_su[:]=het_su[:]-hmg_norm
+
+vmn_1=min(np.nanpercentile(d_1l,mn),np.nanpercentile(d_1h,mn))
+vmx_1=max(np.nanpercentile(d_1l,mx),np.nanpercentile(d_1h,mx))
+vmn_3=min(np.nanpercentile(d_3l,mn),np.nanpercentile(d_3h,mn))
+vmx_3=max(np.nanpercentile(d_3l,mx),np.nanpercentile(d_3h,mx))
+
+vmx_3=.14
+vmn_3=0
+vmx_1=4
+vmn_1=0
+
+
+########## DOING THINGS
+
+cmapd='nipy_spectral'
+cmapu='PuOr'
+cmapt='coolwarm'
+fntn=8
+fnts=6
+
+for i in range(2):
+    version=['dke','dke_mke'][i]
+    
+    if version=='dke':
+        dmin=vmn_1
+        dmax=vmx_1*2
+        dlabel=r'$DKE$ ($m^2s^{-2}$)'
+        het_d=het_td
+        hmg_d=hmg_td
+        g=g1l
+    elif version=='dke_mke':
+        dmin=vmn_3
+        dmax=0.2
+        dlabel=r'$\frac{DKE}{DKE+MKE}$'
+        het_d=het_tdm
+        hmg_d=hmg_tdm
+        g=g2l
+        
+    
+    im = g[1].imshow(het_d.T[3:33,0:11],vmin=dmin,vmax=dmax,origin='lower',aspect=.22*aspct,interpolation='spline16',cmap=cmapd)
+    g[0].imshow(hmg_d.T[3:33,0:11],vmin=dmin,vmax=dmax,origin='lower',aspect=.22*aspct,interpolation='spline16',cmap=cmapd)
+    
+    
+    xticks=np.linspace(0,10,11)
+    xticks_l=['','9:00','','','12:00','','','15:00','','','18:00']
+    yticks=(np.array([0,3.33,6.66,10,13.33,16.66,20,23.33,26.66]))
+    yticks_l=['',200,'',400,'',600,'',800,'']
+    xticks2=[0,50,100,150,200,250,300,350,400,450]
+    xticks2_l=['','',20,'',40,'',60,'',80,'']
+    
+    ax=g[0]
+    ax.set_xticks(xticks,xticks_l,fontsize=fnts)
+    ax.set_yticks(yticks,yticks_l,fontsize=fnts)
+    ax.set_xlabel('Local Hour',fontsize=fntn,labelpad=2)
+    ax.set_ylabel('Height (m)',fontsize=fntn)
+    if i==0:
+        ax.set_title('Homogeneous',fontsize=fntn)
+    
+    ax=g[1]
+    ax.set_xticks(xticks,xticks_l,fontsize=fnts)
+    #ax.set_yticks(yticks,[],fontsize=fnts)
+    ax.set_xlabel('Local Hour',fontsize=fntn,labelpad=2)
+    if i==0:
+        ax.set_title('Heterogeneous',fontsize=fntn)
+
+    cb=g.cbar_axes[0].colorbar(im)
+    cb.ax.tick_params(labelsize=fnts)
+    cb.set_label(label=dlabel,size=fntn)
+
+g3[0].imshow(hmg_su[5:43,20:500],origin='lower',cmap=cmapu,aspect=7.8*aspct,vmin=-4,vmax=4)
+g3[0].imshow(hmg_tsf[5:43,20:500],origin='lower',cmap=cmapt,aspect=7.8*aspct,vmin=304,vmax=316)
+im=g3[1].imshow(het_su[5:43,20:500],origin='lower',cmap=cmapu,aspect=7.8*aspct,vmin=-4,vmax=4)
+g3[1].imshow(het_tsf[5:43,20:500],origin='lower',cmap=cmapt,aspect=7.8*aspct,vmin=304,vmax=316)
+
+yticks=(np.array([-0.6,2.6,5.8,9,12.2,15.4,18.6,21.8,25,28.2]))
+yticks_l=[0,'',200,'',400,'',600,'',800,'']
+yticks=yticks+5
+g3[0].set_yticks(yticks,yticks_l,fontsize=fnts)
+g3[0].set_xticks(xticks2,xticks2_l,fontsize=fnts)
+g3[0].set_xlabel('Distance (km)',fontsize=fntn,labelpad=2)
+g3[0].set_ylabel('Height (m)',fontsize=fntn)
+
+g3[1].set_yticks(yticks,yticks_l,fontsize=fnts)
+g3[1].set_xticks(xticks2,xticks2_l,fontsize=fnts)
+g3[1].set_xlabel('Distance (km)',fontsize=fntn,labelpad=2)
+
+cb=g3.cbar_axes[0].colorbar(im)
+cb.ax.tick_params(labelsize=fnts)
+cb.set_label(label=r'$u$ ($ms^{-1}$)',size=fntn)
+
+g1l[0].grid(True,alpha=1,color='black',linewidth=.1)
+g1l[1].grid(True,alpha=1,color='black',linewidth=.1)
+g2l[0].grid(True,alpha=1,color='black',linewidth=.1)
+g2l[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+################## LIDAR
+xticks_l=['','9:00','','','12:00','','','15:00','','','18:00']
+yticks=np.array([ 0.34900162,  4.19800314,  8.04700483, 11.89600605, 15.74500815,19.59400989, 23.44301088, 27.29201328, 31.14101365])
+yticks_l=['',200,'',400,'',600,'',800,'']
+
+g1d[0].imshow(d_1l.T[0:-1,:],cmap=cmap,origin='lower',aspect=.19*aspct,vmin=vmn_1,vmax=vmx_1,interpolation='spline16')
+im=g1d[1].imshow(d_1h.T[0:-1,:],cmap=cmap,origin='lower',aspect=.19*aspct,vmin=vmn_1,vmax=vmx_1,interpolation='spline16')
+
+#gxy[1].set_xticks([0,3,6,9],[])
+#gxy[0].set_xticks([0,3,6,9],[])
+#gxy[1].set_yticks([4.2,11.8,19.6,27.25])
+#g1d[0].set_yticks([4.2,11.8,19.6,27.25,34.9],[])
+
+g1d[0].set_xticks(xticks,[])
+g1d[1].set_xticks(xticks,[])
+g1d[0].set_yticks(yticks,[])
+g1d[1].set_yticks(yticks,[])
+
+
+g1d[0].set_title('Less Heterogeneous',fontsize=fntn)
+g1d[1].set_title('Very Heterogeneous',fontsize=fntn)
+g1d[0].tick_params(labelsize=fnts)
+g1d[1].tick_params(labelsize=fnts)
+#g1d[0].set_ylabel(r'Height $(m)$',fontsize=8)
+g1d[0].grid(True,alpha=1,color='black',linewidth=.1)
+g1d[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+g1d[0].set_xticks(xticks,xticks_l)
+g1d[1].set_xticks(xticks,xticks_l)
+g1d[0].set_xlabel('Local Hour',fontsize=fntn)
+g1d[1].set_xlabel('Local Hour',fontsize=fntn)
+
+cb=g1d.cbar_axes[0].colorbar(im)
+g1d.cbar_axes[0].tick_params(labelsize=fnts)
+cb.set_label(label=clabel1,size=fntn)
+
+
+g2d[0].imshow(d_3l.T[0:-1,:],cmap=cmap,origin='lower',aspect=.19*aspct,vmin=vmn_3,vmax=vmx_3,interpolation='spline16')
+im=g2d[1].imshow(d_3h.T[0:-1,:],cmap=cmap,origin='lower',aspect=.19*aspct,vmin=vmn_3,vmax=vmx_3,interpolation='spline16')
+
+#gz[1].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_xticks([0,3,6,9],time[::3])
+#gz[0].set_yticks([4.2,11.8,19.6,27.25],[200,400,600,800])
+#gz[1].set_yticks([4.2,11.8,19.6,27.25])
+
+g2d[0].set_xticks(xticks,xticks_l)
+g2d[1].set_xticks(xticks,xticks_l)
+g2d[0].set_yticks(yticks,[])
+g2d[1].set_yticks(yticks,[])
+
+g2d[0].tick_params(labelsize=fnts)
+g2d[1].tick_params(labelsize=fnts)
+#g2d[0].set_ylabel(r'Height $(m)$',fontsize=8)
+g2d[0].set_xlabel('Local Hour',fontsize=fntn)
+g2d[1].set_xlabel('Local Hour',fontsize=fntn)
+g2d[0].grid(True,alpha=1,color='black',linewidth=.1)
+g2d[1].grid(True,alpha=1,color='black',linewidth=.1)
+
+cb=g2d.cbar_axes[0].colorbar(im)
+g2d.cbar_axes[0].tick_params(labelsize=fnts)
+cb.set_label(label=clabel3,size=fntn)
+cb.ax.tick_params(labelsize=fnts)
+
+
+#### Add Figure Labeling
+g1d[0].text(-2.6,34.5,'d)',fontsize=8)
+g2d[0].text(-2.6,34.5,'e)',fontsize=8)
+g1l[0].text(-2.6,29.5,'a)',fontsize=8)
+g2l[0].text(-2.6,29.5,'b)',fontsize=8)
+g3[0].text(-90,37.5,'c)',fontsize=8)
+
+subfigs[0,0].suptitle("Large Eddy Simulation\n\n",y=1.12)
+subfigs[0,1].suptitle("LiDAR\n\n",y=1.12)
+
+plt.savefig('../../plot_output/dke1/tke_versions/all_profiles.png', bbox_inches = "tight")
+
+# %%
+d_1h.shape
+
+# %%
+
+# %%
 
 # %% [markdown]
 # # Data for Filtering Cells 
@@ -853,6 +1406,19 @@ lhet_0=fnc['lst_lhet'][:]
 rain=np.nanmean(fnc['precip'][:,2:8],axis=1)
 rain[rain>0]=2
 rain[np.isnan(rain)]=1
+
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# # Velocity and DKE Fraction
+
+# %%
+dke.shape
+
+# %%
+color=plt.get_cmap('Spectral')(lhet/250)
+plt.scatter(ws,dke_1/(dke_1+1/_mke),s=5,c=color)
+
+# %%
+plt.hist(dke_1/(dke_1+1/_mke),bins=np.linspace(0,.5,50))
 
 
 # %%
@@ -1025,11 +1591,13 @@ axs[2,1].set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)')
 print(lims[1][0:idx+1])
 
 plt.subplots_adjust(hspace=.5,wspace=.33)
-plt.savefig('../../plot_output/dke1/filter_select_tsw.png', bbox_inches = "tight")
+#plt.savefig('../../plot_output/dke1/filter_select_tsw.png', bbox_inches = "tight")
 
 # %%
 
-# %% [markdown]
+# %%
+
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Check Correlations -- Sensitivity
 
 # %%
@@ -1148,7 +1716,7 @@ plt.savefig('../../plot_output/dke1/filter_sensitivity_precip3.png', bbox_inches
 
 # %%
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # DKE vs Alpha
 
 # %% [markdown]
@@ -1188,6 +1756,9 @@ for v in range(2):
         yy[v,j,m]=[rat,dke_1][v][m]
         corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
 
+
+# %%
+np.sum(m)
 
 # %% [markdown]
 # #### Plotting
@@ -1276,11 +1847,127 @@ plt.savefig('../../plot_output/dke1/het_type_sensitivity_ext.png', bbox_inches =
 
 # %%
 
-# %%
+# %% [markdown]
+# # Heterogeneity Differences Combined
 
 # %%
+m0=(repo>=3)
+m1=(ws2<15)&(abet>70)&(repo>=3)&(vort<2.5*10**(-4))&(rain<=0)
+
+
+color=plt.get_cmap('Spectral')(ws2/15)
+
+corr=np.zeros((2,4))
+#corr2=np.zeros((2,4))
+xx=np.ones((2,4,273))*float('nan')
+yy=np.ones((2,4,273))*float('nan')
+
+for v in range(2):
+    for j in range(4):
+        m=[m0,m1][v]
+        xx[v,j,m]=[lhet,lhet_0,cv,cv_s][j][m]
+        yy[v,j,m]=dke_1[m]
+        corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
 
 # %%
+fig,axs=plt.subplots(2,4,figsize=(6,3),width_ratios=[1,1,1,1.25])
+for i in range(2):
+    for j in range(4):
+        ax=axs[i,j]
+        if i==1:
+            ax.scatter(xx[0,j],yy[0,j],s=2,c='grey',alpha=.1)
+        ax.scatter(xx[i,j],yy[i,j],s=3,c=color)
+
+        xmin=np.nanmin(xx[0,j])
+        xmax=np.nanmax(xx[0,j])
+
+
+        # logscale
+        ax.semilogy()
+        ax.grid(True,color='black',linewidth=.2)
+        ax.set_title(r'$\rho_s=$'+str(np.round(corr[i,j],3)),fontsize=8)
+        ax.text(-(xmax-xmin)*.1+xmin,17.5,['a','b','c','d','e','f','g','h'][j+(i*4)]+')',fontsize=8)
+        
+        if j>0:
+            ax.set_yticklabels([],minor=False)
+        else:
+            ax.set_ylabel(r'$DKE$'+r'($m^2\ s^{-2}$)',fontsize=8)
+            ax.annotate(['No Filter\n','Strong Filter\n'][i],xy=(0,[.2,0.1][i]),xycoords="axes fraction", 
+                     xytext=(-360, 0), textcoords='offset pixels',
+                     fontsize=12, rotation="vertical")
+        if i==0:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xticklabels(ax.get_xticks(),rotation=45,fontsize=8)
+            ax.set_xlabel([r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)',r'$\lambda_{T_s}$ ($m$)',r'$CV_{full}$',r'$CV_{lidar}$'][j])
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
+             ax=axs[0,3], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 15), cmap='Spectral'),
+             ax=axs[1,3], orientation='vertical', label=r'$u_g$ ($ms^{-1}$)')
+fig.subplots_adjust(hspace=.3,wspace=.1)
+
+plt.savefig('../../plot_output/dke1/filter_het_type_cmb.png', bbox_inches = "tight")
+
+# %% [markdown]
+# # Consolidation Continues
+
+# %%
+m0=(repo>=3)
+m1=(ws2<15)&(abet>70)&(repo>=3)&(vort<2.5*10**(-4))&(rain<=0)
+
+
+color=plt.get_cmap('Spectral')(abet/90)
+
+corr=np.zeros((2,4))
+#corr2=np.zeros((2,4))
+xx=np.ones((2,4,273))*float('nan')
+yy=np.ones((2,4,273))*float('nan')
+
+for v in range(2):
+    for j in range(4):
+        m=[m0,m1][v]
+        xx[v,j,m]=[lhet,lhet_0,cv,cv_s][j][m]
+        yy[v,j,m]=dke_1[m]
+        corr[v,j]=spearmanr(xx[v,j],yy[v,j],nan_policy='omit')[0]
+
+# %%
+fig,axs=plt.subplots(2,4,figsize=(6,3),width_ratios=[1,1,1,1.25])
+for i in range(2):
+    for j in range(4):
+        ax=axs[i,j]
+        if i==1:
+            ax.scatter(xx[0,j],yy[0,j],s=1,c='grey',alpha=.1)
+        ax.scatter(xx[i,j],yy[i,j],s=1.5,c=color)
+
+        xmin=np.nanmin(xx[0,j])
+        xmax=np.nanmax(xx[0,j])
+
+
+        # logscale
+        ax.semilogy()
+        ax.grid(True,color='black',linewidth=.2)
+        ax.set_title(r'$\rho_s=$'+str(np.round(corr[i,j],3)),fontsize=8)
+        ax.text(-(xmax-xmin)*.1+xmin,17.5,['a','b','c','d','e','f','g','h'][j+(i*4)]+')',fontsize=8)
+        
+        if j>0:
+            ax.set_yticklabels([],minor=False)
+        else:
+            ax.set_ylabel(r'$DKE$'+r'($m^2\ s^{-2}$)',fontsize=8)
+            ax.annotate(['No Filter\n','Strong Filter\n'][i],xy=(0,[.2,0.1][i]),xycoords="axes fraction", 
+                     xytext=(-360, 0), textcoords='offset pixels',
+                     fontsize=12, rotation="vertical")
+        if i==0:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xticklabels(ax.get_xticks(),rotation=45,fontsize=8)
+            ax.set_xlabel([r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)',r'$\lambda_{T_s}$ ($m$)',r'$CV_{full}$',r'$CV_{lidar}$'][j])
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 90), cmap='Spectral'),
+             ax=axs[0,3], orientation='vertical', label=r'$\alpha$ ($ ^{\circ}$)')
+fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 90), cmap='Spectral'),
+             ax=axs[1,3], orientation='vertical', label=r'$\alpha$ ($ ^{\circ}$)')
+fig.subplots_adjust(hspace=.3,wspace=.1)
+
+plt.savefig('../../plot_output/dke1/filter_het_angle.png', bbox_inches = "tight")
 
 # %%
 
@@ -1357,11 +2044,11 @@ rt_10=np.zeros((Nk,Nit))
 rt_100=np.zeros((Nk,Nit))
 for i in range(Nk):
     k=klist[i]
-    rt_0[i]=fles[k][0]['dke']/fles[k][0]['mke']
+    rt_0[i]=fles[k][0]['dke']#/(fles[k][0]['mke']+fles[k][0]['dke'])
     based=fles[k][0]['dke']
     dke_les[i]=based
     for j in range(Nn):
-        rt=np.array(fles[k][netlist[j]]['dkes'])/np.array(fles[k][netlist[j]]['mkes'])
+        rt=np.array(fles[k][netlist[j]]['dkes'])#/(np.array(fles[k][netlist[j]]['mkes'])+np.array(fles[k][netlist[j]]['dkes']))
         #netrmse[j,i]=np.sqrt(mean_squared_error([based]*Nit,fles[k][netlist[j]]['dkes']))/based
         netrmse[j,i]=np.sqrt(mean_squared_error([rt_0[i]]*Nit,rt))/rt_0[i]
         if netlist[j]==3:
@@ -1407,8 +2094,8 @@ for patch in bplot['boxes']:
 plt.plot(pos[0:-1],np.nanmedian(netrmse.T,axis=0)*100,linewidth=.5,linestyle='--',color=mcolor,alpha=.75)
 plt.xscale('log')
 plt.xlabel('Number of Sites in Virtual Network')
-plt.ylabel(r'nRMSE DKE/MKE (%)')
-plt.savefig('../../plot_output/dke1/les_network_rmse.png', bbox_inches = "tight")
+plt.ylabel(r'nRMSE '+r'$DKE_v$'+' (%)')
+plt.savefig('../../plot_output/dke1/les_network_rmse_dke.png', bbox_inches = "tight")
 
 # %%
 
@@ -1432,11 +2119,11 @@ rt.shape
 fig,axs=plt.subplots(2,3,figsize=(5.5,3))
 axs=axs.flatten()
 ymin=.02
-ymax=10
+ymax=5
 xticks=[50,100,150]
-yticks=[.1,1,10]
+yticks=[.1,1]
 yticks_l=[1,'',3,'',5]
-ylabel=r'$DKE_v/MKE_v$'
+ylabel=r'$\frac{DKE}{DKE+MKE}$'
 
 # handle first axis
 ax=axs[0]
@@ -1449,6 +2136,7 @@ ax.set_ylim(ymin,ymax)
 ax.set_xticks(xticks,[])
 ax.text(90,ymax*.4,r'$\rho=$'+str(rho)[0:5],fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
 ax.text(10,ymax*.4,r'$N=\text{full}$',fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+ax.tick_params(labelsize=8)
 
 for i in range(1,6):
     rt=np.nanmedian([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],axis=1)
@@ -1459,7 +2147,7 @@ for i in range(1,6):
     #err=[hi*0,hi]
     ax=axs[i]
     rho=spearmanr(het_,rt,nan_policy='omit')[0]
-    ax.scatter(het_,rt,color='darkgreen',alpha=.55,s=err*100)
+    ax.scatter(het_,rt,color='darkgreen',alpha=.55,s=err*200)
     ax.set_yscale('log')
     ax.set_ylim(ymin,ymax)
     ax.tick_params(labelsize=8)
@@ -1476,7 +2164,7 @@ for i in range(1,6):
     ax.text(90,ymax*.4,r'$\rho=$'+str(rho)[0:5],fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
     ax.text(10,ymax*.4,r'$N=$'+str([0,3,5,7,10,100][i]),fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
 plt.subplots_adjust(hspace=.1,wspace=.1)
-plt.savefig('../../plot_output/dke1/les_network_scatter.png', bbox_inches = "tight")
+plt.savefig('../../plot_output/dke1/les_network_scatter_ket.png', bbox_inches = "tight")
 
 
 # %%
@@ -1484,6 +2172,153 @@ np.nanmean(err)
 
 # %%
 np.nanmean(np.nanstd(rt_100,axis=1))
+
+# %% [markdown]
+# # LES Sensitivity -- Combined
+
+# %%
+klist=list(fles.keys())
+klist.sort()
+netlist=list(fles[klist[0]].keys())
+Nn=len(netlist)-1
+Nk=len(klist)
+Nit=100
+
+netrmse=np.zeros((Nn,Nk))
+dke_les=np.zeros((Nk,))
+het_=np.zeros((Nk,))
+ell_=np.zeros((Nk,))
+rt_0=np.zeros((Nk,))
+rt_3=np.zeros((Nk,Nit))
+rt_5=np.zeros((Nk,Nit))
+rt_7=np.zeros((Nk,Nit))
+rt_10=np.zeros((Nk,Nit))
+rt_100=np.zeros((Nk,Nit))
+for i in range(Nk):
+    k=klist[i]
+    rt_0[i]=fles[k][0]['dke']#/(fles[k][0]['mke']+fles[k][0]['dke'])
+    based=fles[k][0]['dke']
+    dke_les[i]=based
+    for j in range(Nn):
+        rt=np.array(fles[k][netlist[j]]['dkes'])#/(np.array(fles[k][netlist[j]]['mkes'])+np.array(fles[k][netlist[j]]['dkes']))
+        #netrmse[j,i]=np.sqrt(mean_squared_error([based]*Nit,fles[k][netlist[j]]['dkes']))/based
+        netrmse[j,i]=np.sqrt(mean_squared_error([rt_0[i]]*Nit,rt))/rt_0[i]
+        if netlist[j]==3:
+            rt_3[i,:]=rt
+        if netlist[j]==5:
+            rt_5[i,:]=rt
+        if netlist[j]==7:
+            rt_7[i,:]=rt
+        if netlist[j]==10:
+            rt_10[i,:]=rt
+        if netlist[j]==100:
+            rt_100[i,:]=rt
+    het_[i]=fles_hets[k]
+
+# %%
+fig=plt.figure(figsize=(5.5,4))
+sbf=fig.subfigures(2, 1, hspace=0.15,wspace=0,frameon=False,height_ratios=[1.5,1])
+ax0=sbf[0].subplots(1,1)
+axs=sbf[1].subplots(1,3)
+pos=np.array(netlist)
+mcolor='navy'
+flierprops={'markersize':2}
+medianprops = dict(color=mcolor)
+boxprops = dict(linestyle='-', linewidth=.5)
+widths=pos[0:-1]/12#np.ones((len(pos),))
+bplot=ax0.boxplot(netrmse.T*100,positions=pos[0:-1],widths=widths,patch_artist=True,medianprops=medianprops,boxprops=boxprops,flierprops=flierprops)
+for patch in bplot['boxes']:
+        patch.set_facecolor('darkgreen')
+        patch.set_alpha(.55)
+ax0.plot(pos[0:-1],np.nanmedian(netrmse.T,axis=0)*100,linewidth=.5,linestyle='--',color=mcolor,alpha=.75)
+ax0.set_xscale('log')
+ax0.set_xlabel('$N$ Sites in Virtual Network')
+ax0.set_ylabel(r'nRMSE '+r'$DKE$'+' (%)')
+ax0.text(2.5,55,'a)',fontsize=10)
+
+######################
+
+
+klist=list(fles.keys())
+klist.sort()
+netlist=list(fles[klist[0]].keys())
+Nn=len(netlist)-1
+Nk=len(klist)
+Nit=100
+
+netrmse=np.zeros((Nn,Nk))
+dke_les=np.zeros((Nk,))
+het_=np.zeros((Nk,))
+ell_=np.zeros((Nk,))
+rt_0=np.zeros((Nk,))
+rt_3=np.zeros((Nk,Nit))
+rt_5=np.zeros((Nk,Nit))
+rt_7=np.zeros((Nk,Nit))
+rt_10=np.zeros((Nk,Nit))
+rt_100=np.zeros((Nk,Nit))
+for i in range(Nk):
+    k=klist[i]
+    rt_0[i]=fles[k][0]['dke']/(fles[k][0]['mke']+fles[k][0]['dke'])
+    based=fles[k][0]['dke']
+    dke_les[i]=based
+    for j in range(Nn):
+        rt=np.array(fles[k][netlist[j]]['dkes'])/(np.array(fles[k][netlist[j]]['mkes'])+np.array(fles[k][netlist[j]]['dkes']))
+        #netrmse[j,i]=np.sqrt(mean_squared_error([based]*Nit,fles[k][netlist[j]]['dkes']))/based
+        netrmse[j,i]=np.sqrt(mean_squared_error([rt_0[i]]*Nit,rt))/rt_0[i]
+        if netlist[j]==3:
+            rt_3[i,:]=rt
+        if netlist[j]==5:
+            rt_5[i,:]=rt
+        if netlist[j]==7:
+            rt_7[i,:]=rt
+        if netlist[j]==10:
+            rt_10[i,:]=rt
+        if netlist[j]==100:
+            rt_100[i,:]=rt
+    het_[i]=fles_hets[k]
+
+
+
+##################
+
+
+ymin=.02
+ymax=3
+xticks=[50,100,150]
+yticks=[.1,1]
+yticks_l=[1,'',3,'',5]
+ylabel=r'$\frac{DKE}{DKE+MKE}$'
+
+for i in range(3):
+    rt=np.nanmedian([rt_3,rt_10,rt_100][i],axis=1)
+    #lo=np.nanpercentile([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],25,axis=1)-rt
+    err=np.nanstd([rt_3,rt_10,rt_100][i],axis=1)
+    #hi=np.nanpercentile([0,rt_3,rt_5,rt_7,rt_10,rt_100][i],90,axis=1)-rt
+    #print(np.nanmean((err)))
+    #err=[hi*0,hi]
+    ax=axs[i]
+    rho=spearmanr(het_,rt,nan_policy='omit')[0]
+    ax.scatter(het_,rt,color='darkgreen',alpha=.55,s=err*200)
+    ax.set_yscale('log')
+    ax.set_ylim(ymin,ymax)
+    ax.tick_params(labelsize=8)
+    ax.set_xlabel(r'$\lambda_{T_s}\sigma_{T_s}/\overline{T_s}$  ($m$)',fontsize=10)
+    if i==0:
+        ax.set_ylabel(ylabel,fontsize=10)
+    else:
+        ax.set_yticks(yticks,[])
+        #ax.set_yticks(yticks,yticks_l)
+    ax.text(90,ymax*.4,r'$\rho=$'+str(rho)[0:5],fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+    ax.text(10,ymax*.4,r'$N=$'+str([3,10,100][i]),fontsize=8,bbox=dict(facecolor='white',alpha=.7,linewidth=0))
+    ax.text(10,ymax*1.3,['b)','c)','d)'][i],fontsize=10)
+
+sbf[1].subplots_adjust(hspace=.1,wspace=.1)
+#plt.show()
+plt.savefig('../../plot_output/dke1/network_cmb.png', bbox_inches = "tight")
+
+# %%
+
+# %%
 
 # %% [markdown]
 # # Scratch

@@ -995,3 +995,97 @@ plt.scatter(fp['lst_std_site'][:],fp['lst_std'][:],s=10,c=color)
 plt.plot([0,5],[0,5],'k--',alpha=.5)
 
 # %%
+from matplotlib.animation import FuncAnimation
+import matplotlib as pl
+from numpy import random
+data=np.ones((50,25,25))*1.3
+        
+for i in range(50):
+    data[i]=data[i]+random.rand(25,25)*6
+    for ii in range(25):
+        for jj in range(25):
+            data[i,ii,jj] = data[i,ii,jj]+random.randint(20,60)/40*np.cos(ii/25*np.pi+i/50)+random.randint(40,60+i)/40*np.cos(jj/25*np.pi-i/50)
+            data[i,ii,jj] = data[i,ii,jj]+random.randint(20,60)/80*np.cos(ii/(3+i/10)*np.pi)+random.randint(20,60)/90*np.cos((jj+i)/5*np.pi)
+            data[i,ii,jj] = data[i,ii,jj]+random.randint(20,60)/100*np.cos((ii+i)/10*np.pi)+random.randint(20,60)/110*np.cos(jj/8*np.pi)
+
+data=data/10
+mn=np.mean(data)*np.ones((25,25))
+ps=np.mean(data,axis=0)-mn
+
+# %%
+
+# %%
+plt.plot(np.linspace(0,np.pi),np.cos(np.linspace(0,np.pi)))
+
+# %%
+fig,ax=plt.subplots(1,1,dpi=300,figsize=(3,2))
+vmin=-1
+vmax=1
+im=ax.imshow(mn[:,:],origin='lower',interpolation=None,cmap='Spectral_r',vmin=vmin,vmax=vmax)
+#ax.set_title('Temperature',color=text_color)
+ax.axis(False)
+cbar= fig.colorbar(im,cax=ax.inset_axes([0.97, 0, 0.03, 1]))
+ax.set_title(r'$\langle\overline{w}\rangle$ ($m\ s^{-1}$)', fontsize=14)
+plt.savefig('../../plot_output/jbtlk/dke_mke.png', bbox_inches = "tight")
+
+# %%
+fig,ax=plt.subplots(1,1,dpi=300,figsize=(3,2))
+vmin=-.8
+vmax=.8
+im=ax.imshow(ps[:,:],origin='lower',interpolation=None,cmap='Spectral_r',vmin=vmin,vmax=vmax)
+#ax.set_title('Temperature',color=text_color)
+ax.axis(False)
+cbar= fig.colorbar(im,cax=ax.inset_axes([0.97, 0, 0.03, 1]))
+ax.set_title(r"$\overline{w}''$ ($m\ s^{-1}$)", fontsize=14)
+plt.savefig('../../plot_output/jbtlk/dke_dke.png', bbox_inches = "tight")
+
+# %%
+
+# %%
+fig,ax=plt.subplots(1,1,dpi=300,figsize=(3,2))
+vmin=-1
+vmax=1
+def animate(i):
+    ax.cla()
+    
+    im=ax.imshow(data[i,:,:],origin='lower',interpolation=None,cmap='Spectral_r',vmin=vmin,vmax=vmax)
+    #ax.set_title('Temperature',color=text_color)
+    ax.axis(False)
+    cbar= fig.colorbar(im,cax=ax.inset_axes([0.97, 0, 0.03, 1]))
+    ax.set_title(r'$w$ ($m\ s^{-1}$)', fontsize=14)
+    return fig
+
+ani=FuncAnimation(fig,animate,frames=49,interval=100,repeat=False)
+Pwriter= pl.animation.PillowWriter(fps=2)
+ani.save('../../plot_output/jbtlk/dke_full.gif',writer=Pwriter)
+animate(49)
+
+# %%
+fig,ax=plt.subplots(1,1,dpi=300,figsize=(3,2))
+vmin=-1
+vmax=1
+def animate(i):
+    ax.cla()
+    
+    im=ax.imshow(data[i,:,:]-mn-ps,origin='lower',interpolation=None,cmap='Spectral_r',vmin=vmin,vmax=vmax)
+    #ax.set_title('Temperature',color=text_color)
+    ax.axis(False)
+    cbar= fig.colorbar(im,cax=ax.inset_axes([0.97, 0, 0.03, 1]))
+    ax.set_title(r"$w'$ ($m\ s^{-1}$)", fontsize=14)
+    return fig
+
+ani=FuncAnimation(fig,animate,frames=49,interval=100,repeat=False)
+Pwriter= pl.animation.PillowWriter(fps=2)
+ani.save('../../plot_output/jbtlk/dke_tke.gif',writer=Pwriter)
+animate(49)
+
+# %%
+np.var(data[i,:,:]-mn-ps)*100
+
+# %%
+np.var(ps)*100
+
+# %%
+mn[0,0]**2
+
+# %%
